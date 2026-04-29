@@ -1,3 +1,4 @@
+import './module-alias';
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';

@@ -1,104 +1,108 @@
 import * as Icons from "../icons";
+import type { ComponentType, SVGProps } from "react";
 
-export const NAV_DATA = [
+type NavSubItem = {
+  title: string;
+  url: string;
+};
+
+type NavItem = {
+  title: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  url?: string;
+  items: NavSubItem[];
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
+export const NAV_DATA: NavSection[] = [
   {
-    label: "MAIN MENU",
+    label: "OPERACAO",
     items: [
       {
         title: "Dashboard",
+        url: "/",
         icon: Icons.HomeIcon,
-        items: [
-          {
-            title: "eCommerce",
-            url: "/",
-          },
-        ],
-      },
-      {
-        title: "Calendar",
-        url: "/calendar",
-        icon: Icons.Calendar,
         items: [],
       },
       {
-        title: "Profile",
-        url: "/profile",
+        title: "Produtos",
+        url: "/produtos",
+        icon: Icons.Table,
+        items: [],
+      },
+      {
+        title: "Clientes",
+        url: "/clientes",
         icon: Icons.User,
         items: [],
       },
       {
-        title: "Forms",
-        icon: Icons.Alphabet,
-        items: [
-          {
-            title: "Form Elements",
-            url: "/forms/form-elements",
-          },
-          {
-            title: "Form Layout",
-            url: "/forms/form-layout",
-          },
-        ],
+        title: "Contatos",
+        url: "/clientes/contatos",
+        icon: Icons.User,
+        items: [],
       },
       {
-        title: "Tables",
-        url: "/tables",
-        icon: Icons.Table,
-        items: [
-          {
-            title: "Tables",
-            url: "/tables",
-          },
-        ],
-      },
-      {
-        title: "Pages",
-        icon: Icons.Alphabet,
-        items: [
-          {
-            title: "Settings",
-            url: "/pages/settings",
-          },
-        ],
+        title: "Orcamentos",
+        url: "/orcamentos",
+        icon: Icons.Calendar,
+        items: [],
       },
     ],
   },
   {
-    label: "OTHERS",
+    label: "CATALOGO",
     items: [
       {
-        title: "Charts",
-        icon: Icons.PieChart,
-        items: [
-          {
-            title: "Basic Chart",
-            url: "/charts/basic-chart",
-          },
-        ],
+        title: "Categorias",
+        url: "/categorias",
+        icon: Icons.Table,
+        items: [],
       },
       {
-        title: "UI Elements",
+        title: "Subcategorias",
+        url: "/subcategorias",
+        icon: Icons.Alphabet,
+        items: [],
+      },
+      {
+        title: "Publicos-alvo",
+        url: "/publicos-alvos",
         icon: Icons.FourCircle,
-        items: [
-          {
-            title: "Alerts",
-            url: "/ui-elements/alerts",
-          },
-          {
-            title: "Buttons",
-            url: "/ui-elements/buttons",
-          },
-        ],
+        items: [],
       },
       {
-        title: "Authentication",
+        title: "Datas promocionais",
+        url: "/datas-promocionais",
+        icon: Icons.PieChart,
+        items: [],
+      },
+      {
+        title: "Vinculos",
+        url: "/vinculos",
+        icon: Icons.FourCircle,
+        items: [],
+      },
+    ],
+  },
+  {
+    label: "SISTEMA",
+    items: [
+      {
+        title: "Usuarios",
+        url: "/usuarios",
         icon: Icons.Authentication,
-        items: [
-          {
-            title: "Sign In",
-            url: "/auth/sign-in",
-          },
-        ],
+        items: [],
+      },
+      {
+        title: "Permissoes",
+        url: "/permissoes",
+        icon: Icons.User,
+        items: [],
       },
     ],
   },
