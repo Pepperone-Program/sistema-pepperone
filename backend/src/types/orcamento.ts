@@ -1,0 +1,76 @@
+export interface Orcamento {
+  id_empresa: number;
+  id_objeto: number;
+  id_orcamento: number;
+  id_cliente: string | null;
+  data_orcamento: string;
+  fantasia: string;
+  endereco: string;
+  endereco_n: string;
+  endereco_compl: string;
+  bairro: string;
+  cep: string;
+  cidade: string;
+  uf: string;
+  pais: string | null;
+  tel: string;
+  tel2: string | null;
+  site: string | null;
+  email: string;
+  obs: string;
+  contato: string;
+  id_condicao: string | null;
+  id_vendedor: string | null;
+  frete: string;
+  frete_valor: string | null;
+  diluir_frete: string;
+  nivel: string;
+  entrega: string;
+  id_captacao: string | null;
+  logotipo: string;
+  layout: string;
+  layout_aprovado: string;
+  data_finalizado: string | null;
+  cancelamento: string | null;
+  agendamento: string | null;
+  primeiro_contato: string | null;
+  recepcao: string;
+  gerencia: string;
+  total_geral_pdf: string | null;
+  texto_email: string | null;
+  ultimo_contato: string | null;
+  motivo_desconto: string | null;
+}
+
+export interface CreateOrcamentoDTO {
+  id_cliente?: string;
+  data_orcamento: string;
+  fantasia: string;
+  endereco: string;
+  endereco_n?: string;
+  endereco_compl?: string;
+  bairro?: string;
+  cep?: string;
+  cidade: string;
+  uf: string;
+  pais?: string;
+  tel: string;
+  tel2?: string;
+  site?: string;
+  email: string;
+  obs?: string;
+  contato: string;
+  id_condicao?: string;
+  id_vendedor?: string;
+  frete?: string;
+  frete_valor?: string;
+  diluir_frete?: string;
+  nivel?: string;
+  entrega?: string;
+  id_captacao?: string;
+  logotipo?: string;
+  layout?: string;
+  layout_aprovado?: string;
+}
+
+export type UpdateOrcamentoDTO = Partial<CreateOrcamentoDTO>;
