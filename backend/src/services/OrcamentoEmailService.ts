@@ -1,5 +1,6 @@
 import type { CreateOrcamentoDTO } from '@/types/orcamento';
 import type { CreateOrcamentoItemDTO } from '@/types/orcamento-item';
+import { ProdutoModel } from '@models/Produto';
 
 type QuoteItemInput = Partial<CreateOrcamentoItemDTO> & {
   [key: string]: unknown;
@@ -189,15 +190,38 @@ function getItemCode(item: QuoteItemInput): unknown {
   );
 }
 
+function getItemProductId(item: QuoteItemInput): number | null {
+  const value =
+    item.id_produto ||
+    item.productId ||
+    item.product_id ||
+    readObjectValue(item.product, ['id_produto', 'productId', 'product_id', 'id']) ||
+    readObjectValue(item.produto_data, ['id_produto', 'productId', 'product_id', 'id']);
+  const productId = Number(value);
+
+  return Number.isInteger(productId) && productId > 0 ? productId : null;
+}
+
 function getItemQuantity(item: QuoteItemInput): unknown {
   return item.quantidade || item.quantity || item.qtd || item.quantidadeSolicitada || 1;
 }
 
-function renderItems(items: QuoteItemInput[]): string {
+function safeImageUrl(value: string | undefined): string | null {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderItems(items: QuoteItemInput[], imageUrls: Map<number, string>): string {
   if (!items.length) {
     return `
       <tr>
-        <td colspan="3" style="padding:14px 12px;font-size:14px;color:#6b7280;border-bottom:1px solid #e5e7eb;">
+        <td colspan="4" style="padding:14px 12px;font-size:14px;color:#6b7280;border-bottom:1px solid #e5e7eb;">
           Nenhum item detalhado foi enviado no payload.
         </td>
       </tr>
@@ -209,9 +233,18 @@ function renderItems(items: QuoteItemInput[]): string {
       const product = getItemProductName(item);
       const codeValue = getItemCode(item);
       const quantity = getItemQuantity(item);
+      const productId = getItemProductId(item);
+      const imageUrl = productId ? safeImageUrl(imageUrls.get(productId)) : null;
 
       return `
         <tr>
+          <td style="width:72px;padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;">
+            ${
+              imageUrl
+                ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product)}" width="64" height="64" style="display:block;width:64px;height:64px;object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;background:#ffffff;" />`
+                : '<span style="color:#9ca3af;">-</span>'
+            }
+          </td>
           <td style="padding:12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;">
             ${escapeHtml(codeValue || '-')}
           </td>
@@ -245,7 +278,11 @@ export class OrcamentoEmailService {
     return getQuoteItems(data).length > 0;
   }
 
-  static renderTemplate(data: QuoteEmailInput, quoteNumber?: number): string {
+  static renderTemplate(
+    data: QuoteEmailInput,
+    quoteNumber?: number,
+    imageUrls: Map<number, string> = new Map()
+  ): string {
     const items = getQuoteItems(data);
     const company = data.empresa || data.fantasia || '-';
     const address = [
@@ -327,12 +364,13 @@ export class OrcamentoEmailService {
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                   <thead>
                     <tr style="background:#f9fafb;">
-                      <th align="left" style="padding:10px 12px;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Codigo</th>
+                      <th align="left" style="padding:10px 12px;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Imagem</th>
+                      <th align="left" style="padding:10px 12px;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Código</th>
                       <th align="left" style="padding:10px 12px;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Nome</th>
                       <th align="right" style="padding:10px 12px;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;">Qtd</th>
                     </tr>
                   </thead>
-                  <tbody>${renderItems(items)}</tbody>
+                  <tbody>${renderItems(items, imageUrls)}</tbody>
                 </table>
 
                 ${renderObservation(data.obs)}
@@ -363,6 +401,20 @@ export class OrcamentoEmailService {
       return;
     }
 
+    const items = getQuoteItems(data);
+    const productIds = items
+      .map(getItemProductId)
+      .filter((productId): productId is number => productId !== null);
+    const imagesByProduct = await ProdutoModel.findImagesByProductIds(productIds);
+    const imageUrls = new Map<number, string>();
+
+    for (const [productId, images] of imagesByProduct) {
+      const firstImage = images[0];
+      if (firstImage?.url_imagem) {
+        imageUrls.set(productId, firstImage.url_imagem);
+      }
+    }
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -374,7 +426,7 @@ export class OrcamentoEmailService {
         to: [fromEmail],
         reply_to: data.email || undefined,
         subject: `Novo orcamento Pepperone${quoteNumber ? ` #${quoteNumber}` : ''} - ${data.fantasia || data.contato || 'Site'}`,
-        html: this.renderTemplate(data, quoteNumber),
+        html: this.renderTemplate(data, quoteNumber, imageUrls),
       }),
     });
 
