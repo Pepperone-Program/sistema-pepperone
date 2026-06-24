@@ -182,7 +182,7 @@ function QuoteEditModal({
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Cliente</span>
-            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.fantasia || "")} name="fantasia" placeholder="Nome fantasia do cliente" required />
+            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.fantasia || "")} name="fantasia" placeholder="Nome fantasia do cliente" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Contato</span>
@@ -194,7 +194,7 @@ function QuoteEditModal({
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Telefone</span>
-            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.tel || "")} name="tel" placeholder="Telefone principal" required />
+            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.tel || "")} name="tel" placeholder="Telefone principal" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Telefone 2</span>
@@ -222,11 +222,11 @@ function QuoteEditModal({
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Cidade</span>
-            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.cidade || "")} name="cidade" placeholder="Cidade" required />
+            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.cidade || "")} name="cidade" placeholder="Cidade" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">UF</span>
-            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm uppercase dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.uf || "")} maxLength={2} name="uf" placeholder="UF" required />
+            <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm uppercase dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.uf || "")} maxLength={2} name="uf" placeholder="UF" />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Site</span>
