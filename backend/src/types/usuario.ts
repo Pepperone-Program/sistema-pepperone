@@ -46,6 +46,7 @@ export interface CreateUsuarioDTO {
 }
 
 export interface UpdateUsuarioDTO {
+  usuario?: string;
   nome?: string;
   email?: string;
   senha?: string;

@@ -210,7 +210,7 @@ export const resources: Record<string, ResourceConfig> = {
       { name: "usuario", label: "Usuario", required: true },
       { name: "nome", label: "Nome", required: true },
       { name: "email", label: "Email", type: "email", required: true },
-      { name: "senha", label: "Senha", required: true },
+      { name: "senha", label: "Senha", type: "password", requiredOnCreate: true },
       { name: "cidade", label: "Cidade" },
       { name: "uf", label: "UF" },
       { name: "habilitado", label: "Status", type: "select", options: habilitadoOptions },

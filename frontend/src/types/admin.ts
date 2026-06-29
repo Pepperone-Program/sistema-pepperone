@@ -1,10 +1,11 @@
-export type FieldType = "text" | "number" | "email" | "date" | "select" | "textarea";
+export type FieldType = "text" | "number" | "email" | "password" | "date" | "select" | "textarea";
 
 export type ResourceField = {
   name: string;
   label: string;
   type?: FieldType;
   required?: boolean;
+  requiredOnCreate?: boolean;
   readonly?: boolean;
   options?: { label: string; value: string }[];
 };

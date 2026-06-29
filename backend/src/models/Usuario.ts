@@ -155,14 +155,38 @@ export class UsuarioModel {
     usuarioId: number,
     data: UpdateUsuarioDTO
   ): Promise<boolean> {
+    const allowedColumns = [
+      'usuario',
+      'nome',
+      'email',
+      'senha',
+      'ramal',
+      'tel',
+      'cel',
+      'endereco',
+      'endereco_n',
+      'endereco_compl',
+      'bairro',
+      'cep',
+      'cidade',
+      'uf',
+      'comissao',
+      'data_final',
+      'habilitado',
+    ];
     const updates: string[] = [];
     const values: any[] = [];
 
     for (const [key, value] of Object.entries(data)) {
+      if (!allowedColumns.includes(key)) continue;
+
       if (key === 'senha' && value) {
         const hashedPassword = oldPasswordHash(value as string);
         updates.push(`${key} = ?`);
         values.push(hashedPassword);
+      } else if (key === 'usuario' && value) {
+        updates.push(`${key} = ?`);
+        values.push(String(value).trim().toLowerCase());
       } else if (value !== undefined) {
         updates.push(`${key} = ?`);
         values.push(value ?? null);

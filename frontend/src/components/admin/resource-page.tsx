@@ -36,9 +36,11 @@ function formatCell(value: unknown, field: ResourceField) {
 function FieldControl({
   field,
   value,
+  required,
 }: {
   field: ResourceField;
   value?: unknown;
+  required?: boolean;
 }) {
   const baseClass =
     "w-full rounded-md border border-stroke bg-gray-2 px-3 py-2.5 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white";
@@ -55,7 +57,7 @@ function FieldControl({
         className={`${baseClass} min-h-24 resize-y`}
         defaultValue={defaultValue}
         name={field.name}
-        required={field.required}
+        required={required}
       />
     );
   }
@@ -66,7 +68,7 @@ function FieldControl({
         className={baseClass}
         defaultValue={defaultValue || field.options?.[0]?.value}
         name={field.name}
-        required={field.required}
+        required={required}
       >
         {field.options?.map((option) => (
           <option key={option.value} value={option.value}>
@@ -83,7 +85,7 @@ function FieldControl({
       defaultValue={defaultValue}
       name={field.name}
       placeholder={field.label}
-      required={field.required}
+      required={required}
       type={field.type || "text"}
     />
   );
@@ -347,13 +349,19 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
 
           <form className="space-y-4" onSubmit={handleSubmit} key={selected ? String(selected[config.idField]) : "new"}>
             {config.formFields.map((field) => (
-              <label className="block" key={field.name}>
-                <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">
-                  {field.label}
-                  {field.required && <span className="text-red-500"> *</span>}
-                </span>
-                <FieldControl field={field} value={formValues[field.name]} />
-              </label>
+              (() => {
+                const required = Boolean(field.required || (!selected && field.requiredOnCreate));
+
+                return (
+                  <label className="block" key={field.name}>
+                    <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">
+                      {field.label}
+                      {required && <span className="text-red-500"> *</span>}
+                    </span>
+                    <FieldControl field={field} required={required} value={formValues[field.name]} />
+                  </label>
+                );
+              })()
             ))}
 
             <button

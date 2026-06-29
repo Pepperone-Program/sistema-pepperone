@@ -125,6 +125,16 @@ export class UsuarioService {
 
     const usuarioSeguro = usuario as Usuario;
 
+    if (data.usuario && data.usuario.trim().toLowerCase() !== usuarioSeguro.usuario) {
+      const usuarioExistente = await UsuarioModel.findByUsername(
+        empresaId,
+        data.usuario
+      );
+      if (usuarioExistente && usuarioExistente.id_usuario !== usuarioId) {
+        throwError('DUPLICATE_USER', 'UsuÃ¡rio jÃ¡ existe', 409);
+      }
+    }
+
     if (data.email && data.email !== usuarioSeguro.email) {
       const emailExistente = await UsuarioModel.findByEmail(
         empresaId,
