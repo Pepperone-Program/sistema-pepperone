@@ -380,7 +380,7 @@ export class OrcamentoEmailService {
               <td style="background:#fafafa;border-radius:0 0 14px 14px;padding:22px 30px;text-align:center;">
                 <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
                   <strong style="color:#6b7280;">Pepperone Brindes</strong> · Brindes Corporativos Personalizados<br />
-                  Notificacao automatica · Acesse o painel admin para responder ao cliente
+                  Notificacao automática · Acesse o painel admin para responder ao cliente
                 </p>
               </td>
             </tr>

@@ -156,6 +156,7 @@ export class CategoriaController {
               limit: req.query.limit as string | undefined,
               subcategorias: req.query.subcategorias as string | undefined,
               publicos_alvos: req.query.publicos_alvos as string | undefined,
+              datas_promocionais: req.query.datas_promocionais as string | undefined,
               quantidade_minima_min: req.query.quantidade_minima_min as string | undefined,
               quantidade_minima_max: req.query.quantidade_minima_max as string | undefined,
             }

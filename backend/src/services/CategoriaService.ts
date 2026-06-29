@@ -205,6 +205,7 @@ export class CategoriaService {
       limit?: number | string;
       subcategorias?: string;
       publicos_alvos?: string;
+      datas_promocionais?: string;
       quantidade_minima_min?: string;
       quantidade_minima_max?: string;
     }
@@ -221,15 +222,18 @@ export class CategoriaService {
       return Number.isFinite(parsed) ? parsed : undefined;
     };
 
-    const produtos = await CategoriaModel.findCatalogProducts(empresaId, categoriaId, {
+    const catalogFilters = {
       page: Number(query.page || 1),
       limit: Number(query.limit || 100),
       subcategorias: parseIds(query.subcategorias),
       publicosAlvos: parseIds(query.publicos_alvos),
+      datasPromocionais: parseIds(query.datas_promocionais),
       quantidadeMinimaMin: toNumber(query.quantidade_minima_min),
       quantidadeMinimaMax: toNumber(query.quantidade_minima_max),
-    });
-    const filtros = await CategoriaModel.findCatalogFacets(empresaId, categoriaId);
+    };
+
+    const produtos = await CategoriaModel.findCatalogProducts(empresaId, categoriaId, catalogFilters);
+    const filtros = await CategoriaModel.findCatalogFacets(empresaId, categoriaId, catalogFilters);
 
     return {
       categoria,

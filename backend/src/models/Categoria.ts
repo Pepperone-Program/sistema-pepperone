@@ -283,6 +283,7 @@ export class CategoriaModel {
       limit: number;
       subcategorias?: number[];
       publicosAlvos?: number[];
+      datasPromocionais?: number[];
       quantidadeMinimaMin?: number;
       quantidadeMinimaMax?: number;
     }
@@ -331,6 +332,18 @@ export class CategoriaModel {
         )
       `);
       values.push(...filters.publicosAlvos);
+    }
+
+    if (filters.datasPromocionais?.length) {
+      where.push(`
+        EXISTS (
+          SELECT 1
+          FROM aux_datas_promocionais_produtos adp_filter
+          WHERE adp_filter.id_produto = p.id_produto
+            AND adp_filter.id_data_promocional IN (${filters.datasPromocionais.map(() => '?').join(',')})
+        )
+      `);
+      values.push(...filters.datasPromocionais);
     }
 
     const whereSql = where.join(' AND ');
@@ -473,24 +486,81 @@ export class CategoriaModel {
     return { items: products, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
   }
 
-  static async findCatalogFacets(empresaId: number, categoriaId: number) {
+  static async findCatalogFacets(
+    empresaId: number,
+    categoriaId: number,
+    filters: {
+      publicosAlvos?: number[];
+      datasPromocionais?: number[];
+      quantidadeMinimaMin?: number;
+      quantidadeMinimaMax?: number;
+    } = {}
+  ) {
     const baseValues = [empresaId, empresaId, categoriaId];
+    const subcategoriaWhere: string[] = [
+      'acp.id_empresa = ?',
+      'p.id_empresa = ?',
+      'acp.id_categoria = ?',
+      "p.habilitado = 'S'",
+      "p.site = 'S'",
+    ];
+    const subcategoriaValues: any[] = [empresaId, empresaId, categoriaId];
+
+    if (filters.quantidadeMinimaMin !== undefined) {
+      subcategoriaWhere.push("CAST(COALESCE(NULLIF(p.quantidade_minima, ''), 0) AS UNSIGNED) >= ?");
+      subcategoriaValues.push(filters.quantidadeMinimaMin);
+    }
+
+    if (filters.quantidadeMinimaMax !== undefined) {
+      subcategoriaWhere.push("CAST(COALESCE(NULLIF(p.quantidade_minima, ''), 0) AS UNSIGNED) <= ?");
+      subcategoriaValues.push(filters.quantidadeMinimaMax);
+    }
+
+    if (filters.publicosAlvos?.length) {
+      subcategoriaWhere.push(`
+        EXISTS (
+          SELECT 1
+          FROM aux_publicos_alvos_produtos app_filter
+          WHERE app_filter.id_produto = p.id_produto
+            AND app_filter.id_publico_alvo IN (${filters.publicosAlvos.map(() => '?').join(',')})
+        )
+      `);
+      subcategoriaValues.push(...filters.publicosAlvos);
+    }
+
+    if (filters.datasPromocionais?.length) {
+      subcategoriaWhere.push(`
+        EXISTS (
+          SELECT 1
+          FROM aux_datas_promocionais_produtos adp_filter
+          WHERE adp_filter.id_produto = p.id_produto
+            AND adp_filter.id_data_promocional IN (${filters.datasPromocionais.map(() => '?').join(',')})
+        )
+      `);
+      subcategoriaValues.push(...filters.datasPromocionais);
+    }
+
     const [subcategorias, publicosAlvos, datasPromocionais, quantidadeRows] = await Promise.all([
       query(
         `
-          SELECT s.id_subcategoria, s.subcategoria, COUNT(DISTINCT p.id_produto) as total
+          SELECT s.id_subcategoria, s.subcategoria, COALESCE(totais.total, 0) as total
           FROM subcategorias s
-          LEFT JOIN aux_subcategorias_produtos asp
-            ON asp.id_empresa = s.id_empresa AND asp.id_subcategoria = s.id_subcategoria
-          LEFT JOIN aux_categorias_produtos acp
-            ON acp.id_empresa = asp.id_empresa AND acp.id_produto = asp.id_produto AND acp.id_categoria = ?
-          LEFT JOIN produtos p
-            ON p.id_empresa = asp.id_empresa AND p.id_produto = asp.id_produto AND p.habilitado = 'S' AND p.site = 'S'
+          LEFT JOIN (
+            SELECT asp.id_subcategoria, COUNT(DISTINCT p.id_produto) as total
+            FROM aux_categorias_produtos acp
+            INNER JOIN produtos p
+              ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
+            INNER JOIN aux_subcategorias_produtos asp
+              ON asp.id_empresa = p.id_empresa AND asp.id_produto = p.id_produto
+            WHERE ${subcategoriaWhere.join(' AND ')}
+            GROUP BY asp.id_subcategoria
+          ) totais
+            ON totais.id_subcategoria = s.id_subcategoria
           WHERE s.id_empresa = ? AND s.id_categoria = ? AND s.habilitado = 'S'
-          GROUP BY s.id_subcategoria, s.subcategoria, s.ordem
+          GROUP BY s.id_subcategoria, s.subcategoria, s.ordem, totais.total
           ORDER BY s.ordem ASC, s.subcategoria ASC
         `,
-        [categoriaId, empresaId, categoriaId]
+        [...subcategoriaValues, empresaId, categoriaId]
       ),
       query(
         `
