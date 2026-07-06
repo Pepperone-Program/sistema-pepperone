@@ -26,6 +26,28 @@ const initialState: DashboardState = {
   categorias: null,
 };
 
+const formatDateInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const addDaysToDateInput = (date: string, days: number): string => {
+  const [year, month, day] = date.split("-").map(Number);
+  const target = new Date(year, month - 1, day);
+  target.setDate(target.getDate() + days);
+
+  return formatDateInput(target);
+};
+
+const today = new Date();
+const defaultStartDate = formatDateInput(
+  new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6),
+);
+const defaultEndDate = formatDateInput(today);
+
 function StatCard({
   label,
   value,
@@ -49,14 +71,17 @@ function StatCard({
 function RankingTable({
   title,
   data,
+  actions,
 }: {
   title: string;
   data: ProdutoRanking[];
+  actions?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg bg-white shadow-1 dark:bg-gray-dark">
-      <div className="border-b border-stroke px-5 py-4 dark:border-dark-3">
+      <div className="flex flex-col gap-4 border-b border-stroke px-5 py-4 dark:border-dark-3 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-lg font-bold text-dark dark:text-white">{title}</h2>
+        {actions}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -105,6 +130,47 @@ export function AdminDashboard() {
   const [state, setState] = useState(initialState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [customStartDate, setCustomStartDate] = useState(defaultStartDate);
+  const [customEndDate, setCustomEndDate] = useState(defaultEndDate);
+  const [customRanking, setCustomRanking] = useState<ProdutoRanking[]>([]);
+  const [customLoading, setCustomLoading] = useState(false);
+  const [customError, setCustomError] = useState("");
+
+  async function loadCustomRanking(startDate = customStartDate, endDate = customEndDate) {
+    setCustomError("");
+
+    if (!startDate || !endDate) {
+      setCustomError("Informe a data inicial e final.");
+      return;
+    }
+
+    if (startDate > endDate) {
+      setCustomError("A data inicial deve ser menor ou igual a data final.");
+      return;
+    }
+
+    setCustomLoading(true);
+
+    try {
+      const ranking = await apiRequest<ProdutoRanking[]>(
+        "/api/v1/estatisticas-produtos/ranking",
+        {
+          query: {
+            limit: 8,
+            startDate,
+            endDate: addDaysToDateInput(endDate, 1),
+          },
+        },
+      );
+      setCustomRanking(ranking);
+    } catch (err) {
+      setCustomError(
+        err instanceof Error ? err.message : "Falha ao carregar ranking personalizado",
+      );
+    } finally {
+      setCustomLoading(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -123,6 +189,7 @@ export function AdminDashboard() {
         ]);
 
       setState({ estatisticas, produtos, clientes, orcamentos, categorias });
+      await loadCustomRanking(defaultStartDate, defaultEndDate);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar dashboard");
     } finally {
@@ -219,6 +286,50 @@ export function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <RankingTable
+          actions={
+            <form
+              className="grid gap-3 sm:grid-cols-[minmax(0,150px)_minmax(0,150px)_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                loadCustomRanking();
+              }}
+            >
+              <label className="text-xs font-medium text-dark-4 dark:text-dark-6">
+                Inicio
+                <input
+                  className="mt-1 h-10 w-full rounded-lg border border-stroke bg-transparent px-3 text-sm font-medium text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:text-white"
+                  onChange={(event) => setCustomStartDate(event.target.value)}
+                  type="date"
+                  value={customStartDate}
+                />
+              </label>
+              <label className="text-xs font-medium text-dark-4 dark:text-dark-6">
+                Fim
+                <input
+                  className="mt-1 h-10 w-full rounded-lg border border-stroke bg-transparent px-3 text-sm font-medium text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:text-white"
+                  onChange={(event) => setCustomEndDate(event.target.value)}
+                  type="date"
+                  value={customEndDate}
+                />
+              </label>
+              <button
+                className="h-10 self-end rounded-lg bg-primary px-4 text-sm font-bold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={customLoading}
+                type="submit"
+              >
+                {customLoading ? "Carregando..." : "Carregar"}
+              </button>
+            </form>
+          }
+          data={customRanking}
+          title="Mais orcados por periodo"
+        />
+        {customError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 xl:col-span-2">
+            {customError}
+          </div>
+        )}
         <RankingTable
           data={state.estatisticas?.melhores_do_mes || []}
           title="Melhores do mes"
