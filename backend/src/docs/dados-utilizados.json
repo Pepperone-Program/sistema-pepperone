@@ -1,0 +1,365 @@
+{
+  "metadata": {
+    "titulo": "Auditoria de dados consumidos do backend pela aplicacao Pepperone",
+    "gerado_em": "2026-07-14",
+    "base_analisada": "src/**",
+    "backend_base_url_env": "NEXT_API_URL",
+    "backend_base_path": "/api/v1",
+    "criterio_usado": {
+      "utilizado": "Campo acessado para renderizacao, navegacao, filtro, ordenacao, transformacao, validacao ou controle de fluxo.",
+      "nao_utilizado": "Campo presente nos tipos/contratos conhecidos, mas sem leitura funcional na aplicacao.",
+      "nao_mapeado": "A aplicacao aceita e repassa a resposta sem declarar todos os campos; nao e possivel afirmar quais campos extras o backend devolve apenas pelo frontend."
+    },
+    "observacoes": [
+      "Os campos listados como nao utilizados consideram somente o contrato conhecido no repositorio. Campos extras existentes na resposta real precisam ser comparados com este arquivo ou com uma amostra/OpenAPI do backend.",
+      "Todos os endpoints abaixo recebem automaticamente o prefixo /api/v1, exceto o proxy bruto /api/produto-imagem.",
+      "Respostas de listagem podem ser array direto, {data: array}, {data: {items: array}} ou {data: {items, total, page, limit, totalPages}}.",
+      "Falhas GET normalmente viram null/fallback local; portanto alguns endpoints alternativos sao tentados em sequencia."
+    ]
+  },
+  "estruturas_compartilhadas": {
+    "envelope_paginado": {
+      "utilizados": ["data", "data.items", "data.totalPages"],
+      "utilizados_em_endpoints_de_catalogo": ["data.total", "data.page", "data.limit", "data.totalPages"],
+      "nao_utilizados_em_listagens_simples": ["data.total", "data.page", "data.limit"]
+    },
+    "produto": {
+      "utilizados": {
+        "id_produto": "identidade, URL, carrinho, orcamento e imagens",
+        "produto": "titulo, slug, busca e exibicao",
+        "codigo": "codigo exibido, especificacao, busca e item do orcamento",
+        "id_tipo_produto": "mapeado para idTipoProduto",
+        "descricao": "descricao curta e completa; precede obs",
+        "obs": "fallback de descricao",
+        "altura": "features e especificacoes",
+        "largura": "features e especificacoes",
+        "profundidade": "features e especificacoes",
+        "peso": "features e especificacoes",
+        "ncm": "especificacoes",
+        "quantidade_minima": "filtro, feature, especificacao e quantidade inicial",
+        "imagem": "imagem principal ou filename do proxy",
+        "imagem_url": "imagem principal preferencial",
+        "imagens": "galeria embutida",
+        "imagens[].filename": "proxy de imagem",
+        "imagens[].ordem_imagem": "ordenacao preferencial",
+        "imagens[].ordem": "ordenacao fallback",
+        "imagens[].url_imagem": "URL preferencial da galeria",
+        "imagens[].url": "URL fallback da galeria",
+        "data_inclusao": "ordenacao de produtos recentes",
+        "site": "filtro de produto disponivel no site",
+        "habilitado": "filtro de produto ativo",
+        "lancamento": "badge, filtro e pagina de lancamentos",
+        "promocao": "badge e secao promocional",
+        "premium": "badge e secao premium",
+        "video": "video na pagina do produto",
+        "id_categoria": "categoria do produto e filtragem local",
+        "categoria": "nome fallback da categoria",
+        "categorias[].id_categoria": "categoria do produto e filtragem local",
+        "categorias[].categoria": "nome preferencial da categoria",
+        "subcategorias[].id_subcategoria": "filtragem local por subcategoria"
+      },
+      "nao_utilizados": [
+        "id_empresa",
+        "cod_forn",
+        "imagens[].sources",
+        "categorias[].id_empresa",
+        "categorias[].descricao",
+        "categorias[].icon",
+        "categorias[].habilitado",
+        "categorias[].url_capa",
+        "subcategorias[].subcategoria",
+        "subcategorias[].total",
+        "publicos_alvos",
+        "datas_promocionais"
+      ]
+    },
+    "filtros_catalogo": {
+      "utilizados": [
+        "subcategorias[].id_subcategoria",
+        "subcategorias[].subcategoria",
+        "subcategorias[].total",
+        "publicos_alvos[].id_publico_alvo",
+        "publicos_alvos[].publico_alvo",
+        "publicos_alvos[].total",
+        "datas_promocionais[].id_data_promocional",
+        "datas_promocionais[].data_promocional",
+        "datas_promocionais[].total",
+        "quantidade_minima.min",
+        "quantidade_minima.max"
+      ],
+      "nao_utilizados": ["datas_promocionais[].data"]
+    },
+    "categoria": {
+      "utilizados": ["id_categoria", "categoria", "descricao", "habilitado", "url_capa", "ordem quando retornado"],
+      "nao_utilizados": ["id_empresa", "icon"]
+    }
+  },
+  "endpoints_backend": [
+    {
+      "metodo": "GET",
+      "path": "/produtos",
+      "finalidade": "fallback/listagem generica de produtos",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["envelope_paginado", "produto"],
+      "resposta_nao_utilizada": ["campos de produto listados em estruturas_compartilhadas.produto.nao_utilizados"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/produtos/site",
+      "finalidade": "home, lancamentos, produtos relacionados e sitemap",
+      "query_enviada": ["empresaId=1", "page", "limit"],
+      "resposta_utilizada": ["envelope_paginado", "produto"],
+      "resposta_nao_utilizada": ["campos de produto listados em estruturas_compartilhadas.produto.nao_utilizados"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/produtos/site/busca",
+      "finalidade": "busca, sugestoes e resolucao de categoria/tipo/subcategoria",
+      "query_enviada": ["q", "empresaId=1", "page", "limit"],
+      "resposta_utilizada": [
+        "data.items e campos de produto",
+        "data.match_exato_codigo",
+        "data.id_produto",
+        "data.codigo",
+        "data.destino_busca.tipo",
+        "data.destino_busca.id_categoria",
+        "data.destino_busca.id_subcategoria",
+        "data.destino_busca.categoria",
+        "data.destino_busca.subcategoria",
+        "data.destino_busca.id_tipo_produto",
+        "data.destino_busca.tipo_produto",
+        "data.destino_busca.url_sugerida",
+        "data.total",
+        "data.page",
+        "data.limit",
+        "data.totalPages"
+      ],
+      "resposta_nao_utilizada": []
+    },
+    {
+      "metodo": "GET",
+      "path": "/produtos/{id}",
+      "fallbacks": ["/produtos/site/{id}"],
+      "finalidade": "detalhe do produto e busca exata por codigo",
+      "resposta_utilizada": ["data.item ou data", "produto"],
+      "resposta_nao_utilizada": ["campos de produto listados em estruturas_compartilhadas.produto.nao_utilizados"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/produtos/{id}/images",
+      "finalidade": "galeria quando produto.imagens nao vier embutido",
+      "resposta_utilizada": ["filename", "ordem_imagem", "ordem", "url_imagem", "url"],
+      "resposta_nao_utilizada": ["sources"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/produtos/{id}/images/{filename}/view",
+      "finalidade": "stream binario da imagem via proxy",
+      "query_enviada": ["folder=thumb|alta"],
+      "resposta_utilizada": ["body binario", "header Content-Type", "status HTTP"],
+      "resposta_nao_utilizada": ["demais headers"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/categorias/{id}/catalogo",
+      "finalidade": "catalogo e filtros por categoria",
+      "query_enviada": ["empresaId", "page", "limit", "publicos_alvos", "quantidade_minima_min", "quantidade_minima_max", "datas_promocionais", "data_promocional"],
+      "resposta_utilizada": ["data.categoria", "data.filtros", "data.items", "data.total", "data.limit", "data.totalPages"],
+      "resposta_nao_utilizada": ["data.page", "categoria.id_empresa", "categoria.icon"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/publicos-alvos/{id}/catalogo",
+      "finalidade": "catalogo por publico-alvo",
+      "query_enviada": ["empresaId", "page", "limit", "subcategorias", "publicos_alvos", "datas_promocionais", "quantidade_minima_min", "quantidade_minima_max"],
+      "resposta_utilizada": ["data.publico_alvo.id_publico_alvo", "data.publico_alvo.publico_alvo", "data.publico_alvo.descricao", "data.filtros", "data.items", "data.total", "data.page", "data.limit", "data.totalPages"],
+      "resposta_nao_utilizada": ["data.publico_alvo.ordem", "data.publico_alvo.habilitado"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/datas-promocionais/{id}/catalogo",
+      "finalidade": "catalogo por data promocional",
+      "query_enviada": ["empresaId", "page", "limit", "subcategorias", "publicos_alvos", "datas_promocionais", "quantidade_minima_min", "quantidade_minima_max"],
+      "resposta_utilizada": ["data.data_promocional.id_data_promocional", "data.data_promocional.data_promocional", "data.data_promocional.descricao", "data.filtros", "data.items", "data.total", "data.page", "data.limit", "data.totalPages"],
+      "resposta_nao_utilizada": ["data.data_promocional.data", "data.data_promocional.ordem", "data.data_promocional.habilitado"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/tipos-produtos/{id}/catalogo",
+      "finalidade": "catalogo por tipo de produto",
+      "query_enviada": ["empresaId", "page", "limit"],
+      "resposta_utilizada": ["data.tipo_produto.id_empresa", "data.tipo_produto.id_tipo_produto", "data.tipo_produto.tipo_produto", "data.tipo_produto.descricao", "data.tipo_produto.habilitado", "data.filtros", "data.items", "data.total", "data.page", "data.limit", "data.totalPages"],
+      "resposta_nao_utilizada": []
+    },
+    {
+      "metodo": "GET",
+      "path": "/subcategorias/{id}/catalogo",
+      "finalidade": "catalogo por subcategoria",
+      "query_enviada": ["empresaId", "page", "limit"],
+      "resposta_utilizada": ["data.subcategoria.id_subcategoria", "data.subcategoria.subcategoria", "data.filtros", "data.items", "data.total", "data.page", "data.limit", "data.totalPages"],
+      "resposta_nao_utilizada": ["data.subcategoria.total quando presente"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/subcategorias/{id}/produtos",
+      "finalidade": "fallback para obter IDs de produtos da subcategoria",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_produto"],
+      "resposta_nao_utilizada": ["id_empresa", "id_subcategoria"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/datas-promocionais/{id}/produtos",
+      "finalidade": "obter IDs de produtos associados a datas promocionais",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_produto"],
+      "resposta_nao_utilizada": ["id_data_promocional"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/categorias",
+      "fallbacks": ["/produtos/categorias"],
+      "finalidade": "menu, filtros globais e categorias da home",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_categoria", "categoria", "habilitado", "ordem quando presente", "url_capa"],
+      "resposta_nao_utilizada": ["id_empresa", "descricao", "icon"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/publicos-alvos",
+      "fallbacks": ["/publicos_alvos", "/publicos-alvo"],
+      "finalidade": "menu e filtros globais",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_publico_alvo", "publico_alvo", "ordem", "habilitado"],
+      "resposta_nao_utilizada": ["demais campos nao declarados"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/datas-promocionais",
+      "finalidade": "menu, pagina de datas e filtros globais",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_data_promocional", "data_promocional", "ordem", "habilitado"],
+      "resposta_nao_utilizada": ["data", "descricao"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/tipos-produtos/habilitados",
+      "fallbacks": ["/tipos_produtos/habilitados", "/tiposProdutos/habilitados"],
+      "finalidade": "itens do menu Brindes",
+      "query_enviada": ["page", "limit"],
+      "resposta_utilizada": ["id_tipo_produto", "tipo_produto", "habilitado"],
+      "resposta_nao_utilizada": ["demais campos nao declarados"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/banners/ativos",
+      "finalidade": "hero, banners medios e mega banner da home",
+      "query_enviada": ["tipo opcional", "page", "limit"],
+      "resposta_utilizada": ["id_banner", "tipo", "titulo", "url", "ordem", "habilitado", "url_banner", "tamanho_tela"],
+      "resposta_nao_utilizada": ["id_empresa", "id_tipo_produto", "data_inicial", "data_final", "cliques"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/estatisticas/produtos",
+      "fallbacks": ["/produtos/estatisticas", "/estatisticas-produtos"],
+      "finalidade": "secao de produtos mais orcados",
+      "resposta_utilizada": ["mais_orcados[].id_produto", "mais_orcados[].total_registros", "mais_orcados[].total_qtde"],
+      "resposta_nao_utilizada": ["mais_orcados[].codigo", "mais_orcados[].produto"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/orcamentos",
+      "finalidade": "criar orcamento",
+      "request_enviado": ["data_orcamento", "fantasia", "endereco", "endereco_n", "endereco_compl", "bairro", "cep", "cidade", "uf", "tel", "email", "contato", "obs", "nivel=SITE", "entrega=A combinar"],
+      "resposta_utilizada": ["id_orcamento"],
+      "resposta_nao_utilizada": ["todos os demais campos da resposta"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/orcamentos/{id_orcamento}/itens",
+      "finalidade": "adicionar cada produto ao orcamento",
+      "request_enviado": ["id_orcamento", "data_orcamento", "id_produto", "codigo", "produto", "gravacao_cores=0", "quantidade", "preco_unitario"],
+      "resposta_utilizada": ["apenas existencia de resposta JSON truthy para detectar falha"],
+      "resposta_nao_utilizada": ["todos os campos individuais da resposta"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/contato",
+      "finalidade": "formulario de contato",
+      "request_enviado": ["nome", "empresa", "email", "telefone", "assunto", "mensagem"],
+      "resposta_utilizada": ["success", "message"],
+      "resposta_repassada_sem_inspecao_no_proxy": true,
+      "resposta_nao_utilizada": ["demais campos"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/newsletter",
+      "finalidade": "cadastro de newsletter",
+      "request_enviado": ["email"],
+      "resposta_utilizada": ["success", "message"],
+      "resposta_repassada_sem_inspecao_no_proxy": true,
+      "resposta_nao_utilizada": ["demais campos"]
+    }
+  ],
+  "endpoints_frontend_next": [
+    {
+      "metodo": "GET",
+      "path": "/api/menu",
+      "consumido_por": "Header",
+      "resposta_utilizada": ["data[].id", "data[].title", "data[].path", "data[].items[].id", "data[].items[].title", "data[].items[].path"],
+      "resposta_nao_utilizada": ["success"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/api/produtos/busca",
+      "consumido_por": "Header",
+      "query_enviada": ["q", "limit"],
+      "resposta_utilizada": ["data.items[].id", "data.items[].label", "data.items[].path", "destino_busca.tipo", "destino_busca.path"],
+      "resposta_nao_utilizada": ["success", "message", "data.items[].title", "data.items[].codigo", "data.total", "data.page", "data.limit", "data.totalPages", "demais campos de destino_busca"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/api/orcamento",
+      "consumido_por": "Checkout",
+      "request_utilizado": ["customer", "obs", "items[].id", "items[].title", "items[].codigo", "items[].quantity", "items[].discountedPrice"],
+      "resposta_utilizada": ["success", "message", "fallback"],
+      "resposta_nao_utilizada": ["data.id_orcamento", "data.data_orcamento", "data.total_itens"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/api/contato",
+      "consumido_por": "Contact",
+      "resposta_utilizada": ["success", "message"]
+    },
+    {
+      "metodo": "POST",
+      "path": "/api/newsletter",
+      "consumido_por": "Newsletter",
+      "resposta_utilizada": ["success", "message"]
+    },
+    {
+      "metodo": "GET",
+      "path": "/api/produto-imagem",
+      "consumido_por": "Next Image/navegador",
+      "query_enviada": ["id", "filename", "folder"],
+      "resposta_utilizada": ["body binario", "Content-Type"]
+    }
+  ],
+  "integracoes_externas_de_dados": [
+    {
+      "metodo": "GET",
+      "host": "brasilapi.com.br",
+      "path": "/api/cep/v1/{cep}",
+      "request_enviado": ["cep com 8 digitos no path"],
+      "resposta_utilizada": ["state", "city", "neighborhood", "street"],
+      "resposta_nao_utilizada": ["todos os demais campos retornados pela BrasilAPI"]
+    }
+  ],
+  "prioridades_para_ajuste_do_backend": [
+    "Preservar id_produto, produto, codigo, descricao/obs, imagens e flags dos produtos: sao o contrato de maior impacto.",
+    "Preservar o envelope data.items e totalPages nas listagens; catalogos tambem dependem de total/page/limit/totalPages.",
+    "Nao remover aliases de endpoints antes de confirmar qual variante existe em cada ambiente.",
+    "Pode-se considerar remover dos payloads do site os campos marcados como nao utilizados, desde que nao sejam exigidos por outros consumidores do backend.",
+    "Para uma lista absoluta de campos excedentes, exportar uma resposta real ou OpenAPI e comparar com as chaves utilizadas deste arquivo."
+  ]
+}

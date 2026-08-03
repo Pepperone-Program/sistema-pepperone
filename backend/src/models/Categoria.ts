@@ -1,4 +1,5 @@
 import { query } from '@database/connection';
+import { SITE_PRODUTO_COLUMNS_P } from './selectColumns';
 import type {
   Categoria,
   CategoriaProduto,
@@ -361,7 +362,7 @@ export class CategoriaModel {
     const productRows = (await query(
       `
         SELECT
-          p.*,
+          ${SITE_PRODUTO_COLUMNS_P},
           NULL as imagem_url
         FROM aux_categorias_produtos acp
         INNER JOIN produtos p
@@ -382,7 +383,8 @@ export class CategoriaModel {
               SELECT id_imagem, id_produto, url_imagem, ordem_imagem, created_at
               FROM (
                 SELECT
-                  ip.*,
+                  ip.id_imagem, ip.id_produto, ip.url_imagem,
+                  ip.ordem_imagem, ip.created_at,
                   ROW_NUMBER() OVER (
                     PARTITION BY ip.id_produto
                     ORDER BY ip.ordem_imagem ASC, ip.id_imagem ASC

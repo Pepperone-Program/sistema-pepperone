@@ -1,5 +1,6 @@
 import { query } from '@database/connection';
 import { comparePassword, oldPasswordHash } from '@utils/password';
+import { USUARIO_COLUMNS, USUARIO_PUBLIC_COLUMNS } from './selectColumns';
 import type {
   Usuario,
   CreateUsuarioDTO,
@@ -53,7 +54,7 @@ export class UsuarioModel {
     empresaId: number,
     usuarioId: number
   ): Promise<Usuario | null> {
-    const sql = 'SELECT * FROM usuarios WHERE id_empresa = ? AND id_usuario = ?';
+    const sql = `SELECT ${USUARIO_COLUMNS} FROM usuarios WHERE id_empresa = ? AND id_usuario = ?`;
     const result = await query(sql, [empresaId, usuarioId]);
     return (result as any[])[0] || null;
   }
@@ -62,7 +63,7 @@ export class UsuarioModel {
     empresaId: number,
     usuario: string
   ): Promise<Usuario | null> {
-    const sql = 'SELECT * FROM usuarios WHERE id_empresa = ? AND LOWER(usuario) = ?';
+    const sql = `SELECT ${USUARIO_COLUMNS} FROM usuarios WHERE id_empresa = ? AND LOWER(usuario) = ?`;
     const result = await query(sql, [empresaId, usuario.trim().toLowerCase()]);
     return (result as any[])[0] || null;
   }
@@ -72,7 +73,7 @@ export class UsuarioModel {
     usuario: string
   ): Promise<Usuario | null> {
     const sql = `
-      SELECT *
+      SELECT ${USUARIO_COLUMNS}
       FROM usuarios
       WHERE id_empresa = ?
         AND LOWER(usuario) = ?
@@ -88,7 +89,7 @@ export class UsuarioModel {
     empresaId: number,
     email: string
   ): Promise<Usuario | null> {
-    const sql = 'SELECT * FROM usuarios WHERE id_empresa = ? AND email = ?';
+    const sql = `SELECT ${USUARIO_COLUMNS} FROM usuarios WHERE id_empresa = ? AND email = ?`;
     const result = await query(sql, [empresaId, email]);
     return (result as any[])[0] || null;
   }
@@ -99,27 +100,26 @@ export class UsuarioModel {
     limit: number = 100,
     search?: string
   ): Promise<{ items: Omit<Usuario, 'senha'>[]; total: number }> {
-    let sql = 'SELECT * FROM usuarios WHERE id_empresa = ?';
+    let where = 'FROM usuarios WHERE id_empresa = ?';
     const values: any[] = [empresaId];
 
     if (search) {
-      sql += ` AND (nome LIKE ? OR usuario LIKE ? OR email LIKE ?)`;
+      where += ` AND (nome LIKE ? OR usuario LIKE ? OR email LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
+      `SELECT COUNT(*) as total ${where}`,
       values
     );
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    sql += ` ORDER BY nome ASC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${USUARIO_PUBLIC_COLUMNS} ${where} ORDER BY nome ASC LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
-    const result = await query(sql, values);
-    const items = (result as Usuario[]).map(({ senha, ...rest }) => rest);
+    const items = await query(sql, values) as Omit<Usuario, 'senha'>[];
 
     return { items, total };
   }

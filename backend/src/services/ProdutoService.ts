@@ -166,6 +166,18 @@ export class ProdutoService {
     );
 
     if (total === 0) {
+      const prefixSearchResult = await ProdutoModel.searchByProductPrefixForSite(
+        empresaId,
+        normalizedTerm,
+        page,
+        limit
+      );
+
+      items = prefixSearchResult.items;
+      total = prefixSearchResult.total;
+    }
+
+    if (total === 0) {
       const codeSearchResult = await ProdutoModel.searchByCodigoLikeForSite(
         empresaId,
         normalizedTerm,

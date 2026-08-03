@@ -1,5 +1,6 @@
 import { query } from '@database/connection';
 import type { Orcamento, CreateOrcamentoDTO, UpdateOrcamentoDTO } from '@/types/orcamento';
+import { ORCAMENTO_COLUMNS } from './selectColumns';
 
 export class OrcamentoModel {
   static async create(
@@ -58,7 +59,7 @@ export class OrcamentoModel {
     empresaId: number,
     orcamentoId: number
   ): Promise<Orcamento | null> {
-    const sql = 'SELECT * FROM orcamentos WHERE id_empresa = ? AND id_orcamento = ?';
+    const sql = `SELECT ${ORCAMENTO_COLUMNS} FROM orcamentos WHERE id_empresa = ? AND id_orcamento = ?`;
     const result = await query(sql, [empresaId, orcamentoId]);
     return (result as any[])[0] || null;
   }
@@ -69,23 +70,23 @@ export class OrcamentoModel {
     limit: number = 100,
     search?: string
   ): Promise<{ items: Orcamento[]; total: number }> {
-    let sql = 'SELECT * FROM orcamentos WHERE id_empresa = ?';
+    let where = 'FROM orcamentos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
 
     if (search) {
-      sql += ` AND (fantasia LIKE ? OR email LIKE ? OR contato LIKE ?)`;
+      where += ` AND (fantasia LIKE ? OR email LIKE ? OR contato LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
+      `SELECT COUNT(*) as total ${where}`,
       values
     );
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    sql += ` ORDER BY data_orcamento DESC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${ORCAMENTO_COLUMNS} ${where} ORDER BY data_orcamento DESC LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
     const items = await query(sql, values);
@@ -114,7 +115,7 @@ export class OrcamentoModel {
 
     const items = await query(
       `
-        SELECT *
+        SELECT ${ORCAMENTO_COLUMNS}
         FROM orcamentos
         WHERE id_empresa = ? AND id_cliente = ?
         ORDER BY data_orcamento DESC, id_orcamento DESC

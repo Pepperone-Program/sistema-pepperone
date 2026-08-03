@@ -20,6 +20,10 @@ const bannerColumns = `
   tamanho_tela
 `;
 
+const activeBannerColumns = `
+  id_banner, tipo, titulo, url, ordem, habilitado, url_banner, tamanho_tela
+`;
+
 export class BannerModel {
   static async create(empresaId: number, data: CreateBannerDTO): Promise<number> {
     const columns = [
@@ -151,7 +155,7 @@ export class BannerModel {
 
     const result = await query(
       `
-        SELECT ${bannerColumns}
+        SELECT ${activeBannerColumns}
         FROM banners
         ${where}
         ORDER BY tipo ASC, ordem ASC, id_banner ASC

@@ -47,7 +47,18 @@ export class TipoProdutoController {
           )
       );
 
-      successResponse(res, result, 'Tipos de produtos habilitados listados com sucesso');
+      successResponse(
+        res,
+        {
+          ...result,
+          items: result.items.map((item: any) => ({
+            id_tipo_produto: item.id_tipo_produto,
+            tipo_produto: item.tipo_produto,
+            habilitado: item.habilitado,
+          })),
+        },
+        'Tipos de produtos habilitados listados com sucesso'
+      );
     } catch (error) {
       const err = error as any;
       errorResponse(res, err.code || 'ERROR', err.message, err.statusCode || 500);

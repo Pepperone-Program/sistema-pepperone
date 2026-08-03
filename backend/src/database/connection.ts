@@ -26,7 +26,7 @@ const toPositiveInt = (value: string | undefined, fallback: number): number => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const connectionLimit = toPositiveInt(process.env.DB_CONNECTION_LIMIT, 5);
+const connectionLimit = toPositiveInt(process.env.DB_CONNECTION_LIMIT, 30);
 const maxIdle = Math.min(toPositiveInt(process.env.DB_MAX_IDLE, connectionLimit), connectionLimit);
 const readRetryAttempts = toPositiveInt(process.env.DB_READ_RETRY_ATTEMPTS, 2);
 const readRetryDelayMs = toPositiveInt(process.env.DB_READ_RETRY_DELAY_MS, 150);

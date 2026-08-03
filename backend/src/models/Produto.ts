@@ -1,4 +1,5 @@
 import { getConnection, query } from '@database/connection';
+import { PRODUTO_COLUMNS, SITE_PRODUTO_COLUMNS } from './selectColumns';
 import type {
   Produto,
   ProdutoCategoria,
@@ -67,7 +68,7 @@ export class ProdutoModel {
     empresaId: number,
     produtoId: number
   ): Promise<Produto | null> {
-    const sql = 'SELECT * FROM produtos WHERE id_empresa = ? AND id_produto = ?';
+    const sql = `SELECT ${PRODUTO_COLUMNS} FROM produtos WHERE id_empresa = ? AND id_produto = ?`;
     const result = await query(sql, [empresaId, produtoId]);
     return (result as any[])[0] || null;
   }
@@ -77,7 +78,7 @@ export class ProdutoModel {
     produtoId: number
   ): Promise<Produto | null> {
     const sql = `
-      SELECT *
+      SELECT ${SITE_PRODUTO_COLUMNS}
       FROM produtos
       WHERE id_empresa = ?
         AND id_produto = ?
@@ -326,35 +327,35 @@ export class ProdutoModel {
     habilitado?: string,
     site?: string
   ): Promise<{ items: Produto[]; total: number }> {
-    let sql = 'SELECT * FROM produtos WHERE id_empresa = ?';
+    let where = 'FROM produtos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
 
     if (search) {
       const numericSearch = Number(search);
-      sql += ` AND (produto LIKE ? OR codigo LIKE ? OR descricao LIKE ?${Number.isInteger(numericSearch) ? ' OR id_produto = ?' : ''})`;
+      where += ` AND (produto LIKE ? OR codigo LIKE ? OR descricao LIKE ?${Number.isInteger(numericSearch) ? ' OR id_produto = ?' : ''})`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
       if (Number.isInteger(numericSearch)) values.push(numericSearch);
     }
 
     if (habilitado === 'S' || habilitado === 'N') {
-      sql += ' AND habilitado = ?';
+      where += ' AND habilitado = ?';
       values.push(habilitado);
     }
 
     if (site === 'S' || site === 'N') {
-      sql += ' AND site = ?';
+      where += ' AND site = ?';
       values.push(site);
     }
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
+      `SELECT COUNT(*) as total ${where}`,
       values
     );
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    sql += ` ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${PRODUTO_COLUMNS} ${where} ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
     const items = await query(sql, values);
@@ -367,23 +368,23 @@ export class ProdutoModel {
     limit: number = 100,
     search?: string
   ): Promise<{ items: Produto[]; total: number }> {
-    let sql = "SELECT * FROM produtos WHERE id_empresa = ? AND site = 'S' AND habilitado = 'S'";
+    let where = "FROM produtos WHERE id_empresa = ? AND site = 'S' AND habilitado = 'S'";
     const values: any[] = [empresaId];
 
     if (search) {
-      sql += ` AND (produto LIKE ? OR codigo LIKE ? OR descricao LIKE ?)`;
+      where += ` AND (produto LIKE ? OR codigo LIKE ? OR descricao LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
+      `SELECT COUNT(*) as total ${where}`,
       values
     );
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    sql += ` ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${SITE_PRODUTO_COLUMNS} ${where} ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
     const items = await query(sql, values);
@@ -396,46 +397,44 @@ export class ProdutoModel {
     page: number = 1,
     limit: number = 100
   ): Promise<{ items: Produto[]; total: number }> {
-    const words = term
-      .split(/\s+/)
-      .map((word) => word.trim())
-      .filter(Boolean);
-    const productConditions = words.length
-      ? words.map(() => 'produto LIKE ?').join(' AND ')
-      : 'produto LIKE ?';
-    const searchValues = words.length ? words.map((word) => `%${word}%`) : [`%${term}%`];
-    let sql = `
-      SELECT *
+    const fromWhere = `
       FROM produtos
       WHERE id_empresa = ?
         AND site = 'S'
         AND habilitado = 'S'
-        AND ${productConditions}
+        AND MATCH (produto, descricao, obs) AGAINST (?)
     `;
-    const values: any[] = [empresaId, ...searchValues];
+    const filterValues = [empresaId, term];
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
-      values
+      `SELECT COUNT(*) as total ${fromWhere}`,
+      filterValues
     );
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    sql += `
+    const sql = `
+      SELECT ${SITE_PRODUTO_COLUMNS}
+      ${fromWhere}
       ORDER BY
         CASE
-          WHEN codigo = ? THEN 0
-          WHEN cod_forn = ? THEN 1
-          WHEN produto = ? THEN 2
-          WHEN produto LIKE ? THEN 3
-          ELSE 5
+          WHEN produto = ? THEN 0
+          WHEN produto LIKE ? THEN 1
+          ELSE 2
         END,
+        MATCH (produto, descricao, obs) AGAINST (?) DESC,
         data_modificacao DESC
       LIMIT ? OFFSET ?
     `;
-    values.push(term, term, term, `${term}%`, limit, offset);
 
-    const items = await query(sql, values);
+    const items = await query(sql, [
+      ...filterValues,
+      term,
+      `${term}%`,
+      term,
+      limit,
+      offset,
+    ]);
     return { items: items as Produto[], total };
   }
 
@@ -459,6 +458,38 @@ export class ProdutoModel {
     return (result as Array<Pick<Produto, 'id_produto' | 'codigo'>>)[0] || null;
   }
 
+  static async searchByProductPrefixForSite(
+    empresaId: number,
+    term: string,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<{ items: Produto[]; total: number }> {
+    const fromWhere = `
+      FROM produtos
+      WHERE id_empresa = ?
+        AND site = 'S'
+        AND habilitado = 'S'
+        AND produto LIKE ?
+    `;
+    const values = [empresaId, `${term}%`];
+
+    const countResult = await query(
+      `SELECT COUNT(*) as total ${fromWhere}`,
+      values
+    );
+    const total = (countResult as any[])[0].total;
+
+    const offset = (page - 1) * limit;
+    const items = await query(
+      `SELECT ${SITE_PRODUTO_COLUMNS} ${fromWhere}
+       ORDER BY produto ASC, id_produto ASC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset]
+    );
+
+    return { items: items as Produto[], total };
+  }
+
   static async searchByCodigoLikeForSite(
     empresaId: number,
     codigo: string,
@@ -466,7 +497,7 @@ export class ProdutoModel {
     limit: number = 100
   ): Promise<{ items: Produto[]; total: number }> {
     const sql = `
-      SELECT *
+      SELECT ${SITE_PRODUTO_COLUMNS}
       FROM produtos
       WHERE id_empresa = ?
         AND site = 'S'
@@ -476,7 +507,7 @@ export class ProdutoModel {
     const values: any[] = [empresaId, `%${codigo}%`];
 
     const countResult = await query(
-      sql.replace('SELECT *', 'SELECT COUNT(*) as total'),
+      sql.replace(`SELECT ${SITE_PRODUTO_COLUMNS}`, 'SELECT COUNT(*) as total'),
       values
     );
     const total = (countResult as any[])[0].total;
@@ -550,7 +581,7 @@ export class ProdutoModel {
     codigo: string
   ): Promise<Produto | null> {
     const sql =
-      'SELECT * FROM produtos WHERE id_empresa = ? AND codigo = ? LIMIT 1';
+      `SELECT ${PRODUTO_COLUMNS} FROM produtos WHERE id_empresa = ? AND codigo = ? LIMIT 1`;
     const result = await query(sql, [empresaId, codigo]);
     return (result as any[])[0] || null;
   }

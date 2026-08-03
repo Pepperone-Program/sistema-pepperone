@@ -1,7 +1,14 @@
 "use client";
 
 import { apiFormRequest, apiRequest } from "@/lib/api";
-import { ChangeEvent, DragEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  DragEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type ProdutoImage = {
   id_imagem: number;
@@ -24,7 +31,12 @@ type Props = {
   onChanged?: () => Promise<void> | void;
 };
 
-export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged }: Props) {
+export function ProductImagesPanel({
+  endpoint,
+  produtoId,
+  produtoNome,
+  onChanged,
+}: Props) {
   const [images, setImages] = useState<ProdutoImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,6 +44,9 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
   const [dragActive, setDragActive] = useState(false);
   const [orderChanged, setOrderChanged] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [error, setError] = useState("");
 
   const imageEndpoint = useMemo(
@@ -46,9 +61,17 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
     try {
       const response = await apiRequest<ProdutoImage[]>(imageEndpoint);
       setImages(response);
+      setSelectedImageIds((current) => {
+        const availableIds = new Set(response.map((image) => image.id_imagem));
+        return new Set(
+          [...current].filter((imageId) => availableIds.has(imageId)),
+        );
+      });
       setOrderChanged(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao carregar imagens");
+      setError(
+        err instanceof Error ? err.message : "Falha ao carregar imagens",
+      );
     } finally {
       setLoading(false);
     }
@@ -60,6 +83,12 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
 
   async function refreshAfterChange(nextImages: ProdutoImage[]) {
     setImages(nextImages);
+    setSelectedImageIds((current) => {
+      const availableIds = new Set(nextImages.map((image) => image.id_imagem));
+      return new Set(
+        [...current].filter((imageId) => availableIds.has(imageId)),
+      );
+    });
     setOrderChanged(false);
     await onChanged?.();
   }
@@ -69,13 +98,20 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
     setError("");
 
     try {
-      const response = await apiRequest<ProdutoImage[]>(`${imageEndpoint}/reorder`, {
-        method: "PUT",
-        body: JSON.stringify({ imageIds: images.map((image) => image.id_imagem) }),
-      });
+      const response = await apiRequest<ProdutoImage[]>(
+        `${imageEndpoint}/reorder`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            imageIds: images.map((image) => image.id_imagem),
+          }),
+        },
+      );
       await refreshAfterChange(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao reordenar imagens");
+      setError(
+        err instanceof Error ? err.message : "Falha ao reordenar imagens",
+      );
     } finally {
       setSaving(false);
     }
@@ -91,7 +127,10 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
     files.forEach((file) => formData.append("images", file));
 
     try {
-      const response = await apiFormRequest<ProdutoImage[]>(imageEndpoint, formData);
+      const response = await apiFormRequest<ProdutoImage[]>(
+        imageEndpoint,
+        formData,
+      );
       setSelectedFiles([]);
       await refreshAfterChange(response);
     } catch (err) {
@@ -121,6 +160,66 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
     }
   }
 
+  function toggleImageSelection(imageId: number) {
+    setSelectedImageIds((current) => {
+      const next = new Set(current);
+      if (next.has(imageId)) {
+        next.delete(imageId);
+      } else {
+        next.add(imageId);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllImages() {
+    setSelectedImageIds((current) => {
+      if (current.size === images.length) return new Set();
+      return new Set(images.map((image) => image.id_imagem));
+    });
+  }
+
+  async function removeSelectedImages() {
+    const imageIds = [...selectedImageIds];
+    if (!imageIds.length) return;
+
+    const confirmed = window.confirm(
+      `Excluir ${imageIds.length} ${imageIds.length === 1 ? "imagem selecionada" : "imagens selecionadas"}?`,
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError("");
+
+    let failedCount = 0;
+    for (const imageId of imageIds) {
+      try {
+        await apiRequest<ProdutoImage[]>(
+          `${imageEndpoint}/${encodeURIComponent(String(imageId))}`,
+          { method: "DELETE" },
+        );
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    try {
+      await loadImages();
+      await onChanged?.();
+      if (failedCount) {
+        setError(
+          `${imageIds.length - failedCount} de ${imageIds.length} imagens foram excluídas. Tente novamente para as restantes.`,
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Falha ao atualizar as imagens",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
     setSelectedFiles(Array.from(event.target.files || []));
   }
@@ -128,7 +227,9 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
   function handleDropFiles(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragActive(false);
-    const files = Array.from(event.dataTransfer.files || []).filter((file) => file.type.startsWith("image/"));
+    const files = Array.from(event.dataTransfer.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
     setSelectedFiles(files);
     handleUpload(files);
   }
@@ -187,7 +288,9 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
 
       <div
         className={`mb-4 rounded-md border border-dashed p-4 transition ${
-          dragActive ? "border-primary bg-primary/5" : "border-stroke bg-gray-2 dark:border-dark-3 dark:bg-dark-2"
+          dragActive
+            ? "border-primary bg-primary/5"
+            : "border-stroke bg-gray-2 dark:border-dark-3 dark:bg-dark-2"
         }`}
         onDragLeave={() => setDragActive(false)}
         onDragOver={(event) => {
@@ -198,15 +301,24 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-bold text-dark dark:text-white">Adicionar imagens</p>
+            <p className="text-sm font-bold text-dark dark:text-white">
+              Adicionar imagens
+            </p>
             <p className="text-xs text-dark-4 dark:text-dark-6">
-              Arraste arquivos aqui ou selecione imagens para enviar ao storage e registrar na tabela.
+              Arraste arquivos aqui ou selecione imagens para enviar ao storage
+              e registrar na tabela.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="cursor-pointer rounded-md border border-stroke bg-white px-3 py-2 text-xs font-semibold text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white">
               Selecionar
-              <input accept="image/*" className="hidden" multiple onChange={handleFileInput} type="file" />
+              <input
+                accept="image/*"
+                className="hidden"
+                multiple
+                onChange={handleFileInput}
+                type="file"
+              />
             </label>
             <button
               className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
@@ -214,7 +326,9 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
               onClick={() => handleUpload()}
               type="button"
             >
-              {saving ? "Enviando..." : `Enviar${selectedFiles.length ? ` (${selectedFiles.length})` : ""}`}
+              {saving
+                ? "Enviando..."
+                : `Enviar${selectedFiles.length ? ` (${selectedFiles.length})` : ""}`}
             </button>
           </div>
         </div>
@@ -223,7 +337,9 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
       {images.length > 1 && (
         <div className="mb-4 flex flex-col gap-3 rounded-md border border-stroke bg-gray-2 p-3 dark:border-dark-3 dark:bg-dark-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm font-medium text-dark dark:text-white">
-            {orderChanged ? "Ordem alterada. Salve para atualizar a tabela." : "Arraste pela alca para reordenar."}
+            {orderChanged
+              ? "Ordem alterada. Salve para atualizar a tabela."
+              : "Arraste pela alca para reordenar."}
           </span>
           <button
             className="rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary/90 disabled:opacity-50"
@@ -236,6 +352,37 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
         </div>
       )}
 
+      {!!images.length && !loading && (
+        <div className="mb-4 flex flex-col gap-3 rounded-md border border-stroke p-3 dark:border-dark-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-dark dark:text-white">
+            <input
+              checked={selectedImageIds.size === images.length}
+              className="h-4 w-4 accent-primary"
+              disabled={saving}
+              onChange={toggleAllImages}
+              type="checkbox"
+            />
+            Selecionar todas
+            {selectedImageIds.size > 0 && (
+              <span className="font-normal text-dark-4 dark:text-dark-6">
+                ({selectedImageIds.size}{" "}
+                {selectedImageIds.size === 1 ? "selecionada" : "selecionadas"})
+              </span>
+            )}
+          </label>
+          <button
+            className="rounded-md border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10"
+            disabled={saving || selectedImageIds.size === 0}
+            onClick={removeSelectedImages}
+            type="button"
+          >
+            {saving
+              ? "Excluindo..."
+              : `Excluir selecionadas${selectedImageIds.size ? ` (${selectedImageIds.size})` : ""}`}
+          </button>
+        </div>
+      )}
+
       <div className="space-y-3">
         {loading ? (
           <div className="rounded-md border border-stroke px-4 py-6 text-center text-sm text-dark-4 dark:border-dark-3">
@@ -244,9 +391,11 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
         ) : images.length ? (
           images.map((image, index) => (
             <div
-              className={`grid grid-cols-[32px_72px_1fr] gap-3 rounded-md border border-stroke p-3 transition dark:border-dark-3 ${
-                draggedIndex === index ? "border-primary bg-primary/5" : ""
-              }`}
+              className={`grid grid-cols-[24px_32px_72px_1fr] gap-3 rounded-md border p-3 transition ${
+                selectedImageIds.has(image.id_imagem)
+                  ? "border-primary bg-primary/5 dark:border-primary"
+                  : "border-stroke dark:border-dark-3"
+              } ${draggedIndex === index ? "border-primary bg-primary/5" : ""}`}
               draggable
               onDragEnd={() => setDraggedIndex(null)}
               onDragOver={(event) => event.preventDefault()}
@@ -254,6 +403,17 @@ export function ProductImagesPanel({ endpoint, produtoId, produtoNome, onChanged
               onDrop={() => handleDrop(index)}
               key={image.id_imagem}
             >
+              <label className="flex h-[72px] cursor-pointer items-center justify-center">
+                <input
+                  aria-label={`Selecionar ${image.filename}`}
+                  checked={selectedImageIds.has(image.id_imagem)}
+                  className="h-4 w-4 accent-primary"
+                  disabled={saving}
+                  onChange={() => toggleImageSelection(image.id_imagem)}
+                  type="checkbox"
+                />
+              </label>
+
               <button
                 aria-label={`Arrastar ${image.filename}`}
                 className="flex h-[72px] cursor-grab items-center justify-center rounded-md border border-stroke text-lg font-bold text-dark-4 active:cursor-grabbing dark:border-dark-3 dark:text-dark-6"

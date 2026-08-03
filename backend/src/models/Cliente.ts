@@ -7,6 +7,7 @@ import type {
   UpdateClienteContatoDTO,
   UpdateClienteDTO,
 } from '@/types/cliente';
+import { CLIENTE_COLUMNS, CLIENTE_CONTATO_COLUMNS } from './selectColumns';
 
 const normalizeLimit = (limit: number): number => Math.min(Math.max(limit, 1), 100);
 const normalizePage = (page: number): number => Math.max(page, 1);
@@ -94,7 +95,7 @@ export class ClienteModel {
   }
 
   static async findById(empresaId: number, clienteId: number): Promise<Cliente | null> {
-    const sql = 'SELECT * FROM clientes WHERE id_empresa = ? AND id_cliente = ? LIMIT 1';
+    const sql = `SELECT ${CLIENTE_COLUMNS} FROM clientes WHERE id_empresa = ? AND id_cliente = ? LIMIT 1`;
     const result = await query(sql, [empresaId, clienteId]);
     return (result as Cliente[])[0] || null;
   }
@@ -104,7 +105,7 @@ export class ClienteModel {
     cnpjCpf: string
   ): Promise<Cliente | null> {
     const sql = `
-      SELECT *
+      SELECT ${CLIENTE_COLUMNS}
       FROM clientes
       WHERE id_empresa = ? AND cnpj_cpf = ?
       LIMIT 1
@@ -145,7 +146,7 @@ export class ClienteModel {
     const total = (countResult as any[])[0].total;
     const items = await query(
       `
-        SELECT *
+        SELECT ${CLIENTE_COLUMNS}
         FROM clientes
         ${where}
         ORDER BY fantasia ASC
@@ -255,7 +256,7 @@ export class ClienteContatoModel {
     contatoEmail: string
   ): Promise<ClienteContato | null> {
     const sql = `
-      SELECT *
+      SELECT ${CLIENTE_CONTATO_COLUMNS}
       FROM clientes_contatos
       WHERE id_empresa = ? AND id_cliente = ? AND contato_email = ?
       LIMIT 1
@@ -295,7 +296,7 @@ export class ClienteContatoModel {
     const total = (countResult as any[])[0].total;
     const items = await query(
       `
-        SELECT *
+        SELECT ${CLIENTE_CONTATO_COLUMNS}
         FROM clientes_contatos
         ${where}
         ORDER BY contato_nome ASC, contato_email ASC

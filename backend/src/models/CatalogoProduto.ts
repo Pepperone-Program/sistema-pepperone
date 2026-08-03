@@ -1,4 +1,5 @@
 import { query } from '@database/connection';
+import { SITE_PRODUTO_COLUMNS_P } from './selectColumns';
 
 const normalizeLimit = (limit: number): number => Math.min(Math.max(limit, 1), 500);
 const normalizePage = (page: number): number => Math.max(page, 1);
@@ -107,7 +108,7 @@ export class CatalogoProdutoModel {
 
     const productRows = (await query(
       `
-        SELECT p.*, NULL as imagem_url
+        SELECT ${SITE_PRODUTO_COLUMNS_P}, NULL as imagem_url
         FROM ${relation.table} rel
         INNER JOIN produtos p
           ON p.id_produto = rel.id_produto
@@ -128,7 +129,8 @@ export class CatalogoProdutoModel {
               SELECT id_imagem, id_produto, url_imagem, ordem_imagem, created_at
               FROM (
                 SELECT
-                  ip.*,
+                  ip.id_imagem, ip.id_produto, ip.url_imagem,
+                  ip.ordem_imagem, ip.created_at,
                   ROW_NUMBER() OVER (
                     PARTITION BY ip.id_produto
                     ORDER BY ip.ordem_imagem ASC, ip.id_imagem ASC

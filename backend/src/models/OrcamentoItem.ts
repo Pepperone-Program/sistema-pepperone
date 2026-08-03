@@ -4,6 +4,7 @@ import {
   CreateOrcamentoItemDTO,
   UpdateOrcamentoItemDTO,
 } from '@/types/orcamento-item';
+import { ORCAMENTO_ITEM_COLUMNS } from './selectColumns';
 
 export class OrcamentoItemModel {
   static async create(
@@ -44,7 +45,7 @@ export class OrcamentoItemModel {
   }
 
   static async findById(itemId: number): Promise<OrcamentoItem | null> {
-    const sql = 'SELECT * FROM orcamentos_itens WHERE id_item = ?';
+    const sql = `SELECT ${ORCAMENTO_ITEM_COLUMNS} FROM orcamentos_itens WHERE id_item = ?`;
     const result = await query(sql, [itemId]);
     return (result as any[])[0] || null;
   }
@@ -52,7 +53,7 @@ export class OrcamentoItemModel {
   static async findByOrcamentoId(
     orcamentoId: number
   ): Promise<OrcamentoItem[]> {
-    const sql = 'SELECT * FROM orcamentos_itens WHERE id_orcamento = ? ORDER BY id_item ASC';
+    const sql = `SELECT ${ORCAMENTO_ITEM_COLUMNS} FROM orcamentos_itens WHERE id_orcamento = ? ORDER BY id_item ASC`;
     const result = await query(sql, [orcamentoId]);
     return result as OrcamentoItem[];
   }
