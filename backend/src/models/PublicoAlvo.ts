@@ -203,10 +203,11 @@ export class PublicoAlvoModel {
     const total = (countResult as any[])[0].total;
     const items = await query(
       `
-        SELECT id_publico_alvo, id_produto
-        FROM aux_publicos_alvos_produtos
-        WHERE id_publico_alvo = ?
-        ORDER BY id_produto ASC
+        SELECT app.id_publico_alvo, app.id_produto, p.produto, p.codigo
+        FROM aux_publicos_alvos_produtos app
+        INNER JOIN produtos p ON p.id_produto = app.id_produto
+        WHERE app.id_publico_alvo = ?
+        ORDER BY p.produto ASC, app.id_produto ASC
         LIMIT ? OFFSET ?
       `,
       [publicoAlvoId, safeLimit, (safePage - 1) * safeLimit]

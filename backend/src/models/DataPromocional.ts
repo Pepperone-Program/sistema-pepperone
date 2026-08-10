@@ -203,10 +203,11 @@ export class DataPromocionalModel {
     const total = (countResult as any[])[0].total;
     const items = await query(
       `
-        SELECT id_data_promocional, id_produto
-        FROM aux_datas_promocionais_produtos
-        WHERE id_data_promocional = ?
-        ORDER BY id_produto ASC
+        SELECT adp.id_data_promocional, adp.id_produto, p.produto, p.codigo
+        FROM aux_datas_promocionais_produtos adp
+        INNER JOIN produtos p ON p.id_produto = adp.id_produto
+        WHERE adp.id_data_promocional = ?
+        ORDER BY p.produto ASC, adp.id_produto ASC
         LIMIT ? OFFSET ?
       `,
       [dataPromocionalId, safeLimit, (safePage - 1) * safeLimit]

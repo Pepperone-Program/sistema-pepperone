@@ -75,9 +75,11 @@ export class OrcamentoModel {
     const values: any[] = [empresaId];
 
     if (search) {
-      where += ` AND (fantasia LIKE ? OR email LIKE ? OR contato LIKE ?)`;
+      const numericSearch = Number(search);
+      where += ` AND (fantasia LIKE ? OR email LIKE ? OR contato LIKE ?${Number.isInteger(numericSearch) ? ' OR id_orcamento = ?' : ''})`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
+      if (Number.isInteger(numericSearch)) values.push(numericSearch);
     }
 
     if (data) {
