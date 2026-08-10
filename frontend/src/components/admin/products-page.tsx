@@ -537,7 +537,7 @@ export function ProductsPage() {
               setSearch(event.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por ID, codigo ou produto"
+            placeholder="Buscar por produto"
             value={search}
           />
           <select
