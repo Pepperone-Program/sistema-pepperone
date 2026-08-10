@@ -397,14 +397,15 @@ export class ProdutoModel {
     page: number = 1,
     limit: number = 100
   ): Promise<{ items: Produto[]; total: number }> {
+    const searchPattern = `%${term}%`;
     const fromWhere = `
       FROM produtos
       WHERE id_empresa = ?
         AND site = 'S'
         AND habilitado = 'S'
-        AND MATCH (produto, descricao, obs) AGAINST (?)
+        AND produto LIKE ?
     `;
-    const filterValues = [empresaId, term];
+    const filterValues = [empresaId, searchPattern];
 
     const countResult = await query(
       `SELECT COUNT(*) as total ${fromWhere}`,
@@ -422,7 +423,6 @@ export class ProdutoModel {
           WHEN produto LIKE ? THEN 1
           ELSE 2
         END,
-        MATCH (produto, descricao, obs) AGAINST (?) DESC,
         data_modificacao DESC
       LIMIT ? OFFSET ?
     `;
@@ -431,7 +431,6 @@ export class ProdutoModel {
       ...filterValues,
       term,
       `${term}%`,
-      term,
       limit,
       offset,
     ]);
@@ -456,38 +455,6 @@ export class ProdutoModel {
     );
 
     return (result as Array<Pick<Produto, 'id_produto' | 'codigo'>>)[0] || null;
-  }
-
-  static async searchByProductPrefixForSite(
-    empresaId: number,
-    term: string,
-    page: number = 1,
-    limit: number = 100
-  ): Promise<{ items: Produto[]; total: number }> {
-    const fromWhere = `
-      FROM produtos
-      WHERE id_empresa = ?
-        AND site = 'S'
-        AND habilitado = 'S'
-        AND produto LIKE ?
-    `;
-    const values = [empresaId, `${term}%`];
-
-    const countResult = await query(
-      `SELECT COUNT(*) as total ${fromWhere}`,
-      values
-    );
-    const total = (countResult as any[])[0].total;
-
-    const offset = (page - 1) * limit;
-    const items = await query(
-      `SELECT ${SITE_PRODUTO_COLUMNS} ${fromWhere}
-       ORDER BY produto ASC, id_produto ASC
-       LIMIT ? OFFSET ?`,
-      [...values, limit, offset]
-    );
-
-    return { items: items as Produto[], total };
   }
 
   static async searchByCodigoLikeForSite(
