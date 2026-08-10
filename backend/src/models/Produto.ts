@@ -440,10 +440,10 @@ export class ProdutoModel {
   static async searchByCodigoForSite(
     empresaId: number,
     codigo: string
-  ): Promise<Pick<Produto, 'id_produto' | 'codigo'> | null> {
+  ): Promise<Produto | null> {
     const result = await query(
       `
-        SELECT id_produto, codigo
+        SELECT ${SITE_PRODUTO_COLUMNS}
         FROM produtos
         WHERE id_empresa = ?
           AND site = 'S'
@@ -454,7 +454,7 @@ export class ProdutoModel {
       [empresaId, codigo]
     );
 
-    return (result as Array<Pick<Produto, 'id_produto' | 'codigo'>>)[0] || null;
+    return (result as Produto[])[0] || null;
   }
 
   static async searchByCodigoLikeForSite(

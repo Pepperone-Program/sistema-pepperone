@@ -3,11 +3,9 @@ import type { Produto, CreateProdutoDTO, UpdateProdutoDTO } from '@/types/produt
 import { throwError } from '@utils/helpers';
 
 type SiteSearchResult =
-  | {
+  | (Produto & {
       match_exato_codigo: true;
-      id_produto: number;
-      codigo: string;
-    }
+    })
   | {
       match_exato_codigo: false;
       items: Produto[];
@@ -151,10 +149,12 @@ export class ProdutoService {
         ? await ProdutoModel.searchByCodigoForSite(empresaId, `PEP${normalizedTerm}`)
         : null);
     if (exactCodeMatch) {
+      const [produtoComImagens] = await this.attachImages([exactCodeMatch]);
+      const [produtoCompleto] = await this.attachCategories(empresaId, [produtoComImagens]);
+
       return {
+        ...produtoCompleto,
         match_exato_codigo: true,
-        id_produto: exactCodeMatch.id_produto,
-        codigo: exactCodeMatch.codigo,
       };
     }
 
