@@ -16,6 +16,12 @@ export const metadata: Metadata = {
     default: "Sistema Pepperone",
   },
   description: "Painel administrativo Pepperone conectado as APIs do sistema.",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
   icons: {
     icon: "/images/favicon.ico",
   },

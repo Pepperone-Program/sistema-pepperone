@@ -68,7 +68,8 @@ export class OrcamentoModel {
     empresaId: number,
     page: number = 1,
     limit: number = 100,
-    search?: string
+    search?: string,
+    data?: string
   ): Promise<{ items: Orcamento[]; total: number }> {
     let where = 'FROM orcamentos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
@@ -77,6 +78,11 @@ export class OrcamentoModel {
       where += ` AND (fantasia LIKE ? OR email LIKE ? OR contato LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (data) {
+      where += ' AND DATE(data_orcamento) = ?';
+      values.push(data);
     }
 
     const countResult = await query(

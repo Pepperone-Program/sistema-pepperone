@@ -88,7 +88,10 @@ export class ProdutoService {
     limit: number = 100,
     search?: string,
     habilitado?: string,
-    site?: string
+    site?: string,
+    tipoProduto?: string,
+    categoria?: string,
+    subcategoria?: string
   ): Promise<{ items: Produto[]; total: number; page: number; limit: number }> {
     const { items, total } = await ProdutoModel.findAll(
       empresaId,
@@ -96,7 +99,10 @@ export class ProdutoService {
       limit,
       search,
       habilitado,
-      site
+      site,
+      tipoProduto,
+      categoria,
+      subcategoria
     );
 
     const itemsWithImages = await this.attachImages(items);

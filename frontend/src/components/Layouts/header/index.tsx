@@ -10,9 +10,9 @@ import { useClickOutside } from "@/hooks/use-click-outside";
 import { NAV_DATA } from "../sidebar/data";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
-import { Notification } from "./notification";
 import { ThemeToggleSwitch } from "./theme-toggle";
 import { UserInfo } from "./user-info";
+import { CacheInvalidateButton } from "@/components/admin/cache-invalidate-button";
 
 const SEARCH_ITEMS = NAV_DATA.flatMap((section) =>
   section.items.flatMap((item) => {
@@ -166,7 +166,7 @@ export function Header() {
 
         <ThemeToggleSwitch />
 
-        <Notification />
+        <CacheInvalidateButton />
 
         <div className="shrink-0">
           <UserInfo />

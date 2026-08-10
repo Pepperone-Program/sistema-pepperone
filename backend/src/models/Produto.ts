@@ -325,7 +325,10 @@ export class ProdutoModel {
     limit: number = 100,
     search?: string,
     habilitado?: string,
-    site?: string
+    site?: string,
+    tipoProduto?: string,
+    categoria?: string,
+    subcategoria?: string
   ): Promise<{ items: Produto[]; total: number }> {
     let where = 'FROM produtos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
@@ -346,6 +349,19 @@ export class ProdutoModel {
     if (site === 'S' || site === 'N') {
       where += ' AND site = ?';
       values.push(site);
+    }
+
+    if (tipoProduto && Number.isInteger(Number(tipoProduto))) {
+      where += ' AND id_tipo_produto = ?';
+      values.push(Number(tipoProduto));
+    }
+    if (categoria && Number.isInteger(Number(categoria))) {
+      where += ' AND EXISTS (SELECT 1 FROM aux_categorias_produtos acp WHERE acp.id_empresa = produtos.id_empresa AND acp.id_produto = produtos.id_produto AND acp.id_categoria = ?)';
+      values.push(Number(categoria));
+    }
+    if (subcategoria && Number.isInteger(Number(subcategoria))) {
+      where += ' AND EXISTS (SELECT 1 FROM aux_subcategorias_produtos asp WHERE asp.id_empresa = produtos.id_empresa AND asp.id_produto = produtos.id_produto AND asp.id_subcategoria = ?)';
+      values.push(Number(subcategoria));
     }
 
     const countResult = await query(

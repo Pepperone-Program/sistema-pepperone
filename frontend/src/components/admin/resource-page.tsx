@@ -91,7 +91,7 @@ function FieldControl({
   );
 }
 
-export function ResourcePage({ config }: { config: ResourceConfig }) {
+export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; onRowClick?: (row: Row) => void }) {
   const [data, setData] = useState<PaginatedData<Row> | null>(null);
   const [search, setSearch] = useState("");
   const [habilitado, setHabilitado] = useState("");
@@ -259,15 +259,16 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
                 ) : data?.items.length ? (
                   data.items.map((row) => (
                     <tr
-                      className="border-b border-stroke text-dark hover:bg-gray-2 dark:border-dark-3 dark:text-white dark:hover:bg-dark-2"
+                      className={`border-b border-stroke text-dark hover:bg-gray-2 dark:border-dark-3 dark:text-white dark:hover:bg-dark-2 ${onRowClick ? "cursor-pointer" : ""}`}
                       key={String(row[config.idField])}
+                      onClick={() => onRowClick?.(row)}
                     >
                       {config.columns.map((column) => (
                         <td className="max-w-[280px] px-4 py-3" key={column.name}>
                           {formatCell(row[column.name], column)}
                         </td>
                       ))}
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
                             className="rounded-md border border-stroke px-3 py-1.5 text-xs font-semibold hover:border-primary hover:text-primary dark:border-dark-3"
