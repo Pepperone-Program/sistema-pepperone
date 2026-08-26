@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { EntityProductsModal } from "./promotion-products-modal";
 import { StatusBadge } from "./status-badge";
 
 type Category = Record<string, unknown> & {
@@ -247,6 +248,7 @@ export function SubcategoriesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [modalSubcategory, setModalSubcategory] = useState<Subcategory | null | undefined>(undefined);
+  const [productsSubcategory, setProductsSubcategory] = useState<Subcategory | null>(null);
 
   const categoryById = useMemo(() => {
     const map = new Map<number, Category>();
@@ -375,6 +377,7 @@ export function SubcategoriesPage() {
                       <td className="px-4 py-3"><StatusBadge value={subcategory.habilitado} /></td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
+                          <button className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5" onClick={() => setProductsSubcategory(subcategory)} type="button">Produtos</button>
                           <button className="rounded-md border border-stroke px-3 py-1.5 text-xs font-bold hover:border-primary hover:text-primary dark:border-dark-3" onClick={() => setModalSubcategory(subcategory)} type="button">Editar</button>
                           <button className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50" onClick={() => removeSubcategory(subcategory).catch((err) => setError(err instanceof Error ? err.message : "Falha ao excluir"))} type="button">Excluir</button>
                         </div>
@@ -425,6 +428,16 @@ export function SubcategoriesPage() {
           onClose={() => setModalSubcategory(undefined)}
           onSaved={loadData}
           subcategory={modalSubcategory}
+        />
+      )}
+      {productsSubcategory && (
+        <EntityProductsModal
+          endpoint="/api/v1/subcategorias"
+          entity={productsSubcategory}
+          entityIdField="id_subcategoria"
+          entityNameField="subcategoria"
+          eyebrow="Produtos da subcategoria"
+          onClose={() => setProductsSubcategory(null)}
         />
       )}
     </div>

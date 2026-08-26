@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { EntityProductsModal } from "./promotion-products-modal";
 import { StatusBadge } from "./status-badge";
 
 type Category = Record<string, unknown> & {
@@ -261,6 +262,7 @@ export function CategoriesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [modalCategory, setModalCategory] = useState<Category | null | undefined>(undefined);
+  const [productsCategory, setProductsCategory] = useState<Category | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -358,6 +360,7 @@ export function CategoriesPage() {
                     <td className="px-4 py-3"><StatusBadge value={category.habilitado} /></td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        <button className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5" onClick={() => setProductsCategory(category)} type="button">Produtos</button>
                         <button className="rounded-md border border-stroke px-3 py-1.5 text-xs font-bold hover:border-primary hover:text-primary dark:border-dark-3" onClick={() => setModalCategory(category)} type="button">Editar</button>
                         <button className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50" onClick={() => removeCategory(category).catch((err) => setError(err instanceof Error ? err.message : "Falha ao excluir"))} type="button">Excluir</button>
                       </div>
@@ -402,6 +405,16 @@ export function CategoriesPage() {
       </section>
 
       {modalCategory !== undefined && <CategoryModal category={modalCategory} onClose={() => setModalCategory(undefined)} onSaved={loadData} />}
+      {productsCategory && (
+        <EntityProductsModal
+          endpoint="/api/v1/categorias"
+          entity={productsCategory}
+          entityIdField="id_categoria"
+          entityNameField="categoria"
+          eyebrow="Produtos da categoria"
+          onClose={() => setProductsCategory(null)}
+        />
+      )}
     </div>
   );
 }

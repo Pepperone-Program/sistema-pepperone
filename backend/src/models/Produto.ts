@@ -334,9 +334,17 @@ export class ProdutoModel {
     const values: any[] = [empresaId];
 
     if (search) {
-      where += ' AND produto LIKE ?';
-      const searchPattern = `%${search}%`;
-      values.push(searchPattern);
+      const normalizedSearch = search.trim();
+      const searchPattern = `%${normalizedSearch}%`;
+      const numericId = /^\d+$/.test(normalizedSearch) ? Number(normalizedSearch) : null;
+
+      if (numericId !== null && Number.isSafeInteger(numericId)) {
+        where += ' AND (id_produto = ? OR codigo LIKE ? OR produto LIKE ?)';
+        values.push(numericId, searchPattern, searchPattern);
+      } else {
+        where += ' AND (codigo LIKE ? OR produto LIKE ?)';
+        values.push(searchPattern, searchPattern);
+      }
     }
 
     if (habilitado === 'S' || habilitado === 'N') {
