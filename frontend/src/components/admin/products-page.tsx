@@ -33,7 +33,6 @@ const productFields: ProductField[] = [
   { name: "produto", label: "Produto", required: true },
   { name: "codigo", label: "Codigo", required: true },
   { name: "cod_forn", label: "Cod. fornecedor" },
-  { name: "descricao", label: "Descricao", type: "textarea" },
   { name: "id_tipo_gravacao_padrao", label: "Gravacao padrao", type: "number" },
   { name: "altura", label: "Altura" },
   { name: "largura", label: "Largura" },
@@ -51,6 +50,7 @@ const productFields: ProductField[] = [
   { name: "data_final", label: "Data final", type: "date" },
   { name: "video", label: "Video" },
   { name: "obs", label: "Observacoes", type: "textarea" },
+  { name: "descricao", label: "Descricao", type: "textarea" },
 ];
 
 const flagFields = [
@@ -193,7 +193,7 @@ function Field({ field, value }: { field: ProductField; value?: unknown }) {
     "w-full rounded-md border border-stroke bg-white px-3 py-2.5 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white";
 
   if (field.type === "textarea") {
-    return <textarea className={`${inputClass} min-h-24 resize-y`} defaultValue={defaultValue} name={field.name} placeholder={field.label} />;
+    return <textarea className={`${inputClass} min-h-24 w-50% resize-y`} defaultValue={defaultValue} name={field.name} placeholder={field.label} />;
   }
 
   return (
@@ -206,6 +206,14 @@ function Field({ field, value }: { field: ProductField; value?: unknown }) {
       type={field.type || "text"}
     />
   );
+}
+
+function productFieldLayout(field: ProductField) {
+  if (field.type === "textarea") return "md:col-span-6";
+  if (["produto", "imagem"].includes(field.name)) return "md:col-span-5";
+  if (["video"].includes(field.name)) return "md:col-span-3";
+  if (["codigo", "cod_forn", "ncm", "quantidade_minima", "data_inicial", "data_final"].includes(field.name)) return "md:col-span-2";
+  return "md:col-span-2";
 }
 
 function ProductLinksPanel({ produtoId }: { produtoId: number }) {
@@ -320,12 +328,13 @@ function ProductModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [tab, setTab] = useState<"dados" | "vinculos" | "imagens">("dados");
+  const [savedProduct, setSavedProduct] = useState<Row | null>(product);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [mounted, setMounted] = useState(false);
-  const values = useMemo<Row>(() => ({ ...defaultProduct, ...(product || {}) }), [product]);
-  const productId = product?.id_produto ? Number(product.id_produto) : null;
+  const values = useMemo<Row>(() => ({ ...defaultProduct, ...(savedProduct || {}) }), [savedProduct]);
+  const productId = savedProduct?.id_produto ? Number(savedProduct.id_produto) : null;
   const [selectedTypeId, setSelectedTypeId] = useState(String(values.id_tipo_produto || ""));
 
   useEffect(() => {
@@ -340,6 +349,7 @@ function ProductModal({
     event.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
 
     const formData = new FormData(event.currentTarget);
     const payload: Record<string, unknown> = {};
@@ -360,12 +370,14 @@ function ProductModal({
     });
 
     try {
+      let persisted: Row;
       if (productId) {
-        await updateResource("/api/v1/produtos", productId, payload);
+        persisted = await updateResource<Row>("/api/v1/produtos", productId, payload);
       } else {
-        await createResource("/api/v1/produtos", payload);
+        persisted = await createResource<Row>("/api/v1/produtos", payload);
       }
-      onClose();
+      setSavedProduct(persisted);
+      setSuccess(productId ? "Alterações salvas." : "Produto criado. Agora você pode adicionar vínculos e imagens.");
       await onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar produto");
@@ -375,12 +387,12 @@ function ProductModal({
   }
 
   const modal = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 p-2 backdrop-blur-[2px] sm:p-4" onMouseDown={onClose}>
       <div
-        className="flex h-[86vh] w-full max-w-[1500px] flex-col overflow-hidden rounded-lg bg-white shadow-2 dark:bg-gray-dark"
+        className="flex h-[95vh] w-full max-w-[1780px] flex-col overflow-hidden rounded-xl bg-white shadow-2 dark:bg-gray-dark"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="border-b border-stroke px-6 py-5 dark:border-dark-3">
+        <header className="shrink-0 border-b border-stroke px-5 py-4 dark:border-dark-3 sm:px-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-primary">{productId ? `Produto #${productId}` : "Novo produto"}</p>
@@ -392,35 +404,28 @@ function ProductModal({
             </button>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {(["dados", "vinculos", "imagens"] as const).map((item) => (
-              <button
-                className={`rounded-md px-4 py-2 text-sm font-bold ${tab === item ? "bg-primary text-white" : "bg-gray-2 text-dark dark:bg-dark-2 dark:text-white"}`}
-                disabled={item !== "dados" && !productId}
-                key={item}
-                onClick={() => setTab(item)}
-                type="button"
-              >
-                {item === "dados" ? "Informacoes" : item === "vinculos" ? "Vinculos" : "Imagens"}
-              </button>
-            ))}
-          </div>
         </header>
 
-        <main className="overflow-y-auto p-6">
+        <main className="overflow-y-auto bg-gray-2/50 p-4 dark:bg-dark/20 sm:p-6">
           {error && <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</div>}
+          {success && <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">{success}</div>}
 
-          {tab === "dados" && (
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="block">
+          <div className="space-y-5">
+            <section className="rounded-lg border border-stroke bg-white p-4 dark:border-dark-3 dark:bg-gray-dark sm:p-5">
+              <div className="mb-5 border-b border-stroke pb-4 dark:border-dark-3">
+                <h3 className="text-base font-bold text-dark dark:text-white">Dados do produto</h3>
+                <p className="mt-1 text-sm text-dark-4 dark:text-dark-6">Identificação, dimensões, disponibilidade e conteúdo comercial.</p>
+              </div>
+              <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-12">
+                <label className="md:col-span-3">
                   <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">
                     Tipo <span className="text-red-500">*</span>
                   </span>
                   <ProductTypeSelect value={selectedTypeId} onChange={setSelectedTypeId} />
                 </label>
                 {productFields.map((field) => (
-                  <label className={field.type === "textarea" ? "block md:col-span-2" : "block"} key={field.name}>
+                  <label className={productFieldLayout(field)} key={field.name}>
                     <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">
                       {field.label}
                       {field.required && <span className="text-red-500"> *</span>}
@@ -430,34 +435,53 @@ function ProductModal({
                 ))}
               </div>
 
-              <div className="grid gap-3 rounded-md border border-stroke p-4 dark:border-dark-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-2 border-t border-stroke pt-4 dark:border-dark-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
                 {flagFields.map(([name, label]) => (
                   <label className="flex items-center justify-between rounded-md bg-gray-2 px-3 py-2 dark:bg-dark-2" key={name}>
                     <span className="text-sm font-semibold text-dark dark:text-white">{label}</span>
                     <select className="rounded-md border border-stroke bg-white px-2 py-1 text-sm dark:border-dark-3 dark:bg-gray-dark dark:text-white" defaultValue={String(values[name] || "N")} name={name}>
-                      <option value="S">S</option>
-                      <option value="N">N</option>
+                      <option value="S">Sim</option>
+                      <option value="N">Não</option>
                     </select>
                   </label>
                 ))}
               </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 border-t border-stroke pt-4 dark:border-dark-3">
                 <button className="rounded-md border border-stroke px-4 py-2.5 text-sm font-bold dark:border-dark-3" onClick={onClose} type="button">
-                  Cancelar
+                  Fechar
                 </button>
                 <button className="rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60" disabled={saving} type="submit">
-                  {saving ? "Salvando..." : "Salvar produto"}
+                  {saving ? "Salvando..." : productId ? "Salvar alterações" : "Criar produto"}
                 </button>
               </div>
-            </form>
-          )}
+              </form>
+            </section>
 
-          {tab === "vinculos" && productId && <ProductLinksPanel produtoId={productId} />}
-
-          {tab === "imagens" && productId && (
-            <ProductImagesPanel endpoint="/api/v1/produtos" onChanged={onSaved} produtoId={productId} produtoNome={values.produto} />
-          )}
+            {productId ? (
+              <div className="grid items-start gap-5 2xl:grid-cols-2">
+                <section className="rounded-lg border border-stroke bg-white p-4 dark:border-dark-3 dark:bg-gray-dark sm:p-5">
+                  <div className="mb-5 border-b border-stroke pb-4 dark:border-dark-3">
+                    <h3 className="text-base font-bold text-dark dark:text-white">Vínculos comerciais</h3>
+                    <p className="mt-1 text-sm text-dark-4 dark:text-dark-6">Defina onde este produto será encontrado.</p>
+                  </div>
+                  <ProductLinksPanel produtoId={productId} />
+                </section>
+                <section className="rounded-lg border border-stroke bg-white p-4 dark:border-dark-3 dark:bg-gray-dark sm:p-5">
+                  <div className="mb-5 border-b border-stroke pb-4 dark:border-dark-3">
+                    <h3 className="text-base font-bold text-dark dark:text-white">Imagens do produto</h3>
+                    <p className="mt-1 text-sm text-dark-4 dark:text-dark-6">Envie, ordene e escolha a imagem principal.</p>
+                  </div>
+                  <ProductImagesPanel endpoint="/api/v1/produtos" onChanged={onSaved} produtoId={productId} produtoNome={values.produto} />
+                </section>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-stroke bg-white px-5 py-8 text-center dark:border-dark-3 dark:bg-gray-dark">
+                <p className="font-semibold text-dark dark:text-white">Salve os dados básicos para liberar vínculos e imagens.</p>
+                <p className="mt-1 text-sm text-dark-4 dark:text-dark-6">O modal continuará aberto após a criação.</p>
+              </div>
+            )}
+          </div>
         </main>
       </div>
     </div>
@@ -470,6 +494,7 @@ export function ProductsPage() {
   const [data, setData] = useState<PaginatedData<Row> | null>(null);
   const [search, setSearch] = useState("");
   const [site, setSite] = useState("");
+  const [order, setOrder] = useState<"ASC" | "DESC">("DESC");
   const [filters, setFilters] = useState({ id_categoria: "", id_subcategoria: "", id_tipo_produto: "" });
   const [filterOptions, setFilterOptions] = useState<Record<string, Row[]>>({});
   const [page, setPage] = useState(1);
@@ -482,14 +507,14 @@ export function ProductsPage() {
     setError("");
 
     try {
-      const response = await listResource<Row>("/api/v1/produtos", { page, limit: 12, search, site, ...filters });
+      const response = await listResource<Row>("/api/v1/produtos", { page, limit: 12, search, site, order, ...filters });
       setData(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar produtos");
     } finally {
       setLoading(false);
     }
-  }, [filters, page, search, site]);
+  }, [filters, order, page, search, site]);
 
   useEffect(() => {
     loadData();
@@ -530,7 +555,7 @@ export function ProductsPage() {
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
 
       <section className="rounded-lg bg-white shadow-1 dark:bg-gray-dark">
-        <div className="grid gap-3 border-b border-stroke p-4 dark:border-dark-3 lg:grid-cols-5">
+        <div className="grid gap-3 border-b border-stroke p-4 dark:border-dark-3 lg:grid-cols-2 xl:grid-cols-6">
           <input
             className="w-full rounded-md border border-stroke bg-gray-2 px-4 py-3 text-sm outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white"
             onChange={(event) => {
@@ -552,6 +577,18 @@ export function ProductsPage() {
             <option value="">Site: todos</option>
             <option value="S">Site: S</option>
             <option value="N">Site: N</option>
+          </select>
+          <select
+            aria-label="Ordenar produtos por data de cadastro"
+            className="rounded-md border border-stroke bg-gray-2 px-4 py-3 text-sm outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+            onChange={(event) => {
+              setOrder(event.target.value as "ASC" | "DESC");
+              setPage(1);
+            }}
+            value={order}
+          >
+            <option value="DESC">Mais recentes primeiro</option>
+            <option value="ASC">Mais antigos primeiro</option>
           </select>
           {[
             ["id_categoria", "Categoria", "categorias", "id_categoria", "categoria"],

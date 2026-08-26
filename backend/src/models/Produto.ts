@@ -328,7 +328,8 @@ export class ProdutoModel {
     site?: string,
     tipoProduto?: string,
     categoria?: string,
-    subcategoria?: string
+    subcategoria?: string,
+    orderDirection: 'ASC' | 'DESC' = 'DESC'
   ): Promise<{ items: Produto[]; total: number }> {
     let where = 'FROM produtos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
@@ -377,7 +378,8 @@ export class ProdutoModel {
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    const sql = `SELECT ${PRODUTO_COLUMNS} ${where} ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
+    const safeOrderDirection = orderDirection === 'ASC' ? 'ASC' : 'DESC';
+    const sql = `SELECT ${PRODUTO_COLUMNS} ${where} ORDER BY data_inclusao ${safeOrderDirection}, id_produto ${safeOrderDirection} LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
     const items = await query(sql, values);

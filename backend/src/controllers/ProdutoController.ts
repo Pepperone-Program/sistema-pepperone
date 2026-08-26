@@ -65,6 +65,7 @@ export class ProdutoController {
       const tipoProduto = req.query.id_tipo_produto as string | undefined;
       const categoria = req.query.id_categoria as string | undefined;
       const subcategoria = req.query.id_subcategoria as string | undefined;
+      const orderDirection = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
       const result = await CacheService.getOrSet(
         CacheService.buildKey('produtos', `${empresaId}:${req.originalUrl}`),
@@ -78,7 +79,8 @@ export class ProdutoController {
             site,
             tipoProduto,
             categoria,
-            subcategoria
+            subcategoria,
+            orderDirection
           )
       );
 

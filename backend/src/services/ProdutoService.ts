@@ -91,7 +91,8 @@ export class ProdutoService {
     site?: string,
     tipoProduto?: string,
     categoria?: string,
-    subcategoria?: string
+    subcategoria?: string,
+    orderDirection: 'ASC' | 'DESC' = 'DESC'
   ): Promise<{ items: Produto[]; total: number; page: number; limit: number }> {
     const { items, total } = await ProdutoModel.findAll(
       empresaId,
@@ -102,7 +103,8 @@ export class ProdutoService {
       site,
       tipoProduto,
       categoria,
-      subcategoria
+      subcategoria,
+      orderDirection
     );
 
     const itemsWithImages = await this.attachImages(items);
