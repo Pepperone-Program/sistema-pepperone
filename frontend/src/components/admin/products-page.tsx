@@ -537,7 +537,8 @@ export function ProductsPage() {
               setSearch(event.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por produto"
+            aria-label="Buscar produto por ID, código ou nome"
+            placeholder="Buscar por ID, código ou nome"
             value={search}
           />
           <select
