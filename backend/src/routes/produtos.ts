@@ -4,6 +4,7 @@ import { authMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
 import { productSchema } from '@utils/validation';
 import multer from 'multer';
+import { SearchController } from '@controllers/SearchController';
 
 const router = Router();
 const upload = multer({
@@ -71,6 +72,13 @@ router.get(
   '/site',
   ProdutoController.listSite
 );
+
+router.get('/search/debug', authMiddleware, SearchController.debug);
+router.get('/search/metrics', authMiddleware, SearchController.metrics);
+router.get('/search/dictionary', authMiddleware, SearchController.listDictionary);
+router.post('/search/dictionary', authMiddleware, SearchController.upsertDictionary);
+router.delete('/search/dictionary/:id', authMiddleware, SearchController.deleteDictionary);
+router.post('/search/events', SearchController.recordInteraction);
 
 router.get(
   '/:id',

@@ -1,6 +1,7 @@
 import { ProdutoModel } from '@models/Produto';
 import type { Produto, CreateProdutoDTO, UpdateProdutoDTO } from '@/types/produto';
 import { throwError } from '@utils/helpers';
+import { SearchDocumentService } from '@/search/SearchDocumentService';
 
 type SiteSearchResult =
   | (Produto & {
@@ -64,6 +65,9 @@ export class ProdutoService {
       throwError('CREATE_FAILED', 'Falha ao criar produto', 500);
     }
 
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+      await SearchDocumentService.syncProduct(empresaId, produto as Produto);
+    }
     return produto as Produto;
   }
 
@@ -196,6 +200,22 @@ export class ProdutoService {
     };
   }
 
+  static async findExactProductCodeForSite(
+    empresaId: number,
+    term: string
+  ): Promise<(Produto & { match_exato_codigo: true }) | null> {
+    const normalizedTerm = term.trim();
+    if (!normalizedTerm) return null;
+    const exact = (await ProdutoModel.searchByCodigoForSite(empresaId, normalizedTerm)) ||
+      (!normalizedTerm.toUpperCase().startsWith('PEP')
+        ? await ProdutoModel.searchByCodigoForSite(empresaId, `PEP${normalizedTerm}`)
+        : null);
+    if (!exact) return null;
+    const [withImages] = await this.attachImages([exact]);
+    const [complete] = await this.attachCategories(empresaId, [withImages]);
+    return { ...complete, match_exato_codigo: true };
+  }
+
   static async updateProduto(
     empresaId: number,
     produtoId: number,
@@ -224,6 +244,9 @@ export class ProdutoService {
       throwError('UPDATE_FAILED', 'Falha ao atualizar produto', 500);
     }
 
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+      await SearchDocumentService.syncProduct(empresaId, updated as Produto);
+    }
     return updated as Produto;
   }
 

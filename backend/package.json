@@ -13,6 +13,12 @@
     "import:banner-images": "tsx src/scripts/importBannerImages.ts",
     "catalog:pdf": "tsx src/scripts/generateProductCatalogPdf.ts",
     "catalog:maggenta:pdf": "tsx src/scripts/generateMaggentaProductCatalogPdf.ts",
+    "db:migrate": "tsx src/scripts/runMigrations.ts up",
+    "db:rollback": "tsx src/scripts/runMigrations.ts down",
+    "search:preflight": "tsx src/scripts/searchPreflight.ts",
+    "search:rebuild": "tsx src/scripts/rebuildSearchData.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
@@ -46,6 +52,7 @@
     "@typescript-eslint/parser": "^6.15.0",
     "eslint": "^8.55.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
   }
 }

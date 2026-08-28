@@ -37,18 +37,26 @@ export class CacheService {
     loader: () => Promise<T>,
     ttlSeconds?: number
   ): Promise<T> {
+    return (await this.getOrSetWithStatus(key, loader, ttlSeconds)).value;
+  }
+
+  static async getOrSetWithStatus<T>(
+    key: string,
+    loader: () => Promise<T>,
+    ttlSeconds?: number
+  ): Promise<{ value: T; cacheStatus: 'hit' | 'miss' | 'disabled' }> {
     if (!isEnabled()) {
-      return loader();
+      return { value: await loader(), cacheStatus: 'disabled' };
     }
 
     const cached = await this.get<T>(key);
     if (cached.found) {
-      return cached.value as T;
+      return { value: cached.value as T, cacheStatus: 'hit' };
     }
 
     const value = await loader();
     await this.set(key, value, ttlSeconds);
-    return value;
+    return { value, cacheStatus: 'miss' };
   }
 
   static async invalidateNamespace(namespace: string): Promise<void> {

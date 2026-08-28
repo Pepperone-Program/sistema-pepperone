@@ -141,3 +141,9 @@ Todos os inputs são validados com Joi. Erros de validação retornam:
 - Queries otimizadas com índices
 - Paginação em listas
 - Busca com LIKE eficiente
+
+## Busca pública por relevância
+
+O ranking avançado, suas migrations, preflight, rebuild, rollout e testes estão documentados em
+[`docs/product-search.md`](docs/product-search.md). Ele fica desativado por padrão e não altera a
+busca administrativa.
