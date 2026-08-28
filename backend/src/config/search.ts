@@ -9,8 +9,8 @@ export const SEARCH_LIMITS = {
   candidateLimit: 300,
 } as const;
 
-export const SEARCH_RANKING_VERSION = process.env.SEARCH_RANKING_VERSION || 'v1';
-export const SEARCH_DOCUMENT_VERSION = 1;
+export const SEARCH_RANKING_VERSION = process.env.SEARCH_RANKING_VERSION || 'v2';
+export const SEARCH_DOCUMENT_VERSION = 2;
 export const SEARCH_CACHE_TTL_SECONDS = Number(process.env.SEARCH_CACHE_TTL_SECONDS || 300);
 
 export const SEARCH_WEIGHTS = {

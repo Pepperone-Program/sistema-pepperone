@@ -18,4 +18,11 @@ describe.skipIf(process.env.SEARCH_LIVE_INTEGRATION !== 'true')('live public sea
     expect(result.items[0].produto.toLocaleLowerCase('pt-BR')).toContain('sem pauta');
     expect(result.items.slice(0, 5).some((product) => /com pauta/i.test(product.produto))).toBe(false);
   });
+
+  it('does not return the explicit opposite for either lined-paper intent', async () => {
+    const withLines = await PublicSiteSearchService.search({ empresaId: 1, query: 'bloco com pauta', page: 1, limit: 100, sort: 'relevance', filters: {} });
+    const withoutLines = await PublicSiteSearchService.search({ empresaId: 1, query: 'bloco sem pauta', page: 1, limit: 100, sort: 'relevance', filters: {} });
+    expect(withLines.items.some((product) => /sem pauta/i.test(product.produto))).toBe(false);
+    expect(withoutLines.items.some((product) => /com pauta/i.test(product.produto))).toBe(false);
+  });
 });

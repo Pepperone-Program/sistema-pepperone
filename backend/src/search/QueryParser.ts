@@ -93,10 +93,10 @@ export class QueryParser {
         constraints.push({ key: 'paper_size', value: token.toUpperCase(), strength: 'STRONG', confidence: 1, source: 'TOKEN' });
         consumed.add(token);
       }
-      if (token === 'pauta' || token === 'pautado') {
+      if (!consumed.has(token) && (token === 'pauta' || token === 'pautado')) {
         constraints.push({ key: 'lined', value: true, strength: 'STRONG', confidence: 0.9, source: 'TOKEN', contradictionValues: [false] });
         consumed.add(token);
-      } else if (token === 'liso') {
+      } else if (!consumed.has(token) && token === 'liso') {
         constraints.push({ key: 'lined', value: false, strength: 'STRONG', confidence: 0.9, source: 'TOKEN', contradictionValues: [true] });
         consumed.add(token);
       }

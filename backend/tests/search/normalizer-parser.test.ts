@@ -18,6 +18,15 @@ describe('public product query interpretation', () => {
     expect(parsed.constraints).toContainEqual(expect.objectContaining({ key, value }));
   });
 
+  it('does not reinterpret a token already consumed by an opposite phrase', () => {
+    const withLines = QueryParser.parse('bloco com pauta').constraints.filter((item) => item.key === 'lined');
+    const withoutLines = QueryParser.parse('bloco sem pauta').constraints.filter((item) => item.key === 'lined');
+    expect(withLines).toHaveLength(1);
+    expect(withLines[0].value).toBe(true);
+    expect(withoutLines).toHaveLength(1);
+    expect(withoutLines[0].value).toBe(false);
+  });
+
   it('normalizes capacities and product intent', () => {
     const parsed = QueryParser.parse('garrafa térmica inox 0,5 l');
     expect(parsed.productType?.value).toBe('garrafa');

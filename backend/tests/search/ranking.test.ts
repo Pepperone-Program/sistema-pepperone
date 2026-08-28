@@ -38,4 +38,24 @@ describe('ranking v1 invariants', () => {
     expect(ranked[0].product.id_produto).toBe(2);
     expect(ranked[1].contradictions).toBe(1);
   });
+
+  it('lets an explicit contradiction win over ambiguous duplicated attribute data', () => {
+    const [ranked] = ProductRankingEngine.rank(QueryParser.parse('bloco com pauta'), [
+      candidate(1, 'Bloco Sem Pauta', 'bloco', { attributes: { lined: [false, true] } }),
+    ]);
+    expect(ranked.matchedConstraints).toBe(0);
+    expect(ranked.contradictions).toBe(1);
+    expect(ranked.hardContradiction).toBe(true);
+  });
+
+  it('treats the explicit opposite of a binary phrase as excludable', () => {
+    const [withoutLines] = ProductRankingEngine.rank(QueryParser.parse('bloco com pauta'), [
+      candidate(1, 'Bloco Sem Pauta', 'bloco', { attributes: { lined: [false] } }),
+    ]);
+    const [withLines] = ProductRankingEngine.rank(QueryParser.parse('bloco sem pauta'), [
+      candidate(2, 'Bloco Com Pauta', 'bloco', { attributes: { lined: [true] } }),
+    ]);
+    expect(withoutLines.hardContradiction).toBe(true);
+    expect(withLines.hardContradiction).toBe(true);
+  });
 });

@@ -5,7 +5,7 @@
 O site pesquisa por `GET /api/v1/produtos/site?busca=...`; `search` continua aceito por
 compatibilidade. Essa rota sempre usa interpretação e ranking. Enquanto o schema avançado não
 está ativado, ela recupera candidatos no FULLTEXT/tabelas legadas e os ordena com o mesmo parser
-e ranking (`v1-legacy-schema`). `GET /api/v1/produtos/site/busca?q=...` é um alias compatível.
+e ranking (`v2-legacy-schema`). `GET /api/v1/produtos/site/busca?q=...` é um alias compatível.
 A busca administrativa por ID, código ou nome permanece inalterada. Código exato e a variação
 com prefixo `PEP` continuam tendo precedência.
 

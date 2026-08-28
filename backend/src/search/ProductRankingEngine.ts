@@ -33,15 +33,17 @@ export class ProductRankingEngine {
     let material = 0, capacity = 0, color = 0;
     for (const constraint of parsed.constraints) {
       const matched = hasValue(product, constraint.key, constraint.value);
-      if (matched) {
+      const contradicted = constraint.contradictionValues?.some((value) => hasValue(product, constraint.key, value)) || false;
+      if (contradicted) {
+        contradictions += 1;
+        const isExplicitBinaryPhrase = constraint.source === 'PHRASE' && constraint.confidence >= 0.9;
+        if ((constraint.strength === 'HARD' || isExplicitBinaryPhrase) && constraint.confidence >= 0.9) hardContradiction = true;
+      } else if (matched) {
         matchedConstraints += 1;
         constraintPoints += SEARCH_WEIGHTS.constraint;
         if (constraint.key === 'material') material = SEARCH_WEIGHTS.material;
         if (constraint.key === 'capacity_ml') capacity = SEARCH_WEIGHTS.capacity;
         if (constraint.key === 'color') color = SEARCH_WEIGHTS.color;
-      } else if (constraint.contradictionValues?.some((value) => hasValue(product, constraint.key, value))) {
-        contradictions += 1;
-        if (constraint.strength === 'HARD' && constraint.confidence >= 0.9) hardContradiction = true;
       }
     }
     const totalConstraints = parsed.constraints.length;
