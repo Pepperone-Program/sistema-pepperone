@@ -218,9 +218,9 @@ function CategoryModal({
                 <option value="N">Inativo</option>
               </select>
             </label>
-            <label className="block">
+            <label className="block md:col-span-2">
               <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">Icone</span>
-              <input className="w-full rounded-md border border-stroke px-3 py-2.5 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.icon || "")} name="icon" placeholder="Ícone da categoria" />
+              <textarea className="min-h-32 w-full rounded-md border border-stroke px-3 py-2.5 font-mono text-xs dark:border-dark-3 dark:bg-dark-2 dark:text-white" defaultValue={String(values.icon || "")} name="icon" placeholder='<svg xmlns="http://www.w3.org/2000/svg" ...></svg>' />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-white">URL da capa</span>

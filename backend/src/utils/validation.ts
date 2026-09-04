@@ -103,7 +103,7 @@ export const categoriaSchema = Joi.object({
   id_categoria: Joi.number().integer().min(0).optional(),
   categoria: Joi.string().max(255).required(),
   descricao: Joi.string().allow(null, ''),
-  icon: Joi.string().max(255).allow(null, ''),
+  icon: Joi.string().max(5000).allow(null, ''),
   habilitado: Joi.string().valid('S', 'N').allow(null, '').default('S'),
   url_capa: Joi.string().allow(null, ''),
 });
