@@ -13,6 +13,7 @@
     "import:banner-images": "tsx src/scripts/importBannerImages.ts",
     "catalog:pdf": "tsx src/scripts/generateProductCatalogPdf.ts",
     "catalog:maggenta:pdf": "tsx src/scripts/generateMaggentaProductCatalogPdf.ts",
+    "ai:descriptions": "tsx src/scripts/generateProductDescriptions.ts",
     "db:migrate": "tsx src/scripts/runMigrations.ts up",
     "db:rollback": "tsx src/scripts/runMigrations.ts down",
     "search:preflight": "tsx src/scripts/searchPreflight.ts",

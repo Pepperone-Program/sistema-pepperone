@@ -83,7 +83,13 @@ export class QueryParser {
         materials.push(material); consumed.add(token);
         constraints.push({ key: 'material', value: material, strength: 'STRONG', confidence: 0.9, source: 'TOKEN' });
       }
-      if (entry?.type === 'SYNONYM') synonyms.push(entry.canonicalValue);
+      if (entry?.type === 'SYNONYM') {
+        synonyms.push(entry.canonicalValue);
+        consumed.add(token);
+        if (!productType && PRODUCT_TYPES.has(entry.canonicalValue)) {
+          productType = { value: entry.canonicalValue, confidence: 1 };
+        }
+      }
       if (COLORS.has(token)) {
         const color = COLOR_CANONICAL[token];
         colors.push(color); consumed.add(token);

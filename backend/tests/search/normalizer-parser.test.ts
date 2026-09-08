@@ -44,6 +44,13 @@ describe('public product query interpretation', () => {
     expect(QueryParser.parse('kit vinho duas taças').constraints).toContainEqual(expect.objectContaining({ key: 'contains:taca', value: 2 }));
   });
 
+  it('uses an approved synonym as canonical product intent', () => {
+    const parsed = QueryParser.parse('caderneta', [{ id: 1, term: 'Caderneta', normalizedTerm: 'caderneta', type: 'SYNONYM',
+      canonicalValue: 'caderno', priority: 1, relationType: 'EXACT_SYNONYM', strength: 'STRONG' }]);
+    expect(parsed.productType?.value).toBe('caderno');
+    expect(parsed.positiveTerms).not.toContain('caderneta');
+  });
+
   it.each(["' OR 1=1 --", '++garrafa*', '"garrafa"', 'garrafa) (@@'])('builds safe boolean tokens for %s', (query) => {
     const normalized = normalizeSearchQuery(query);
     const booleanQuery = buildSafeBooleanQuery(normalized.tokens);

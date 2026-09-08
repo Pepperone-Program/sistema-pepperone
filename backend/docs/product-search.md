@@ -3,9 +3,10 @@
 ## Estado e compatibilidade
 
 O site pesquisa por `GET /api/v1/produtos/site?busca=...`; `search` continua aceito por
-compatibilidade. Essa rota sempre usa interpretação e ranking. Enquanto o schema avançado não
-está ativado, ela recupera candidatos no FULLTEXT/tabelas legadas e os ordena com o mesmo parser
-e ranking (`v2-legacy-schema`). `GET /api/v1/produtos/site/busca?q=...` é um alias compatível.
+compatibilidade. Essa rota sempre usa os documentos avançados e FULLTEXT como porta de entrada;
+ela não faz fallback para `LIKE` legado. Se o schema ou o rebuild ainda não cobrirem 100% do
+catálogo público, responde `SEARCH_CATALOG_NOT_READY` em vez de entregar relevância degradada.
+`GET /api/v1/produtos/site/busca?q=...` é um alias compatível.
 A busca administrativa por ID, código ou nome permanece inalterada. Código exato e a variação
 com prefixo `PEP` continuam tendo precedência.
 
@@ -20,8 +21,10 @@ Fluxo: normalização → dicionário → parser determinístico → recuperaç�
 → ranking explicável → separação de relacionados → cursor assinado → resposta/cache/analytics.
 
 O ranking compara, nesta ordem, tipo principal, contradições, constraints atendidas, score
-composto, popularidade e ID estável. Kits que apenas contêm o tipo recebem penalização.
-Contradições HARD confiáveis são excluídas. Dados ausentes não são tratados como negativos.
+composto, popularidade e ID estável. Antes da resposta, um gate exige tipo, termos e atributos
+fortes compatíveis. Kits que apenas contêm o tipo nunca entram no grupo principal: podem compor
+somente a cauda final, limitada a 10% dos resultados principais e inexistente abaixo de dez
+resultados principais. Contradições confiáveis são excluídas.
 
 O parser reconhece frases antes de stopwords, capacidades em ml/l, polegadas, tamanhos A4/A5/A6,
 materiais, cores e negações. Operadores Boolean FULLTEXT nunca vêm diretamente do cliente.
@@ -33,12 +36,12 @@ materiais, cores e negações. Operadores Boolean FULLTEXT nunca vêm diretament
 3. Execute `npm run db:migrate`; o servidor nunca migra no startup.
 4. Execute `npm run search:rebuild -- --dry-run`, depois o rebuild real em lotes.
 5. Defina `SEARCH_DOCUMENT_SYNC_ENABLED=true` somente após schema e backfill.
-6. Compare `/api/v1/produtos/search/debug?q=...` autenticado com a busca vigente.
-7. Ative `SEARCH_RANKING_PERCENTAGE` em 5, 25, 50 e 100, observando os gates.
+6. Confirme que a contagem de documentos públicos é igual à de produtos públicos e que não há
+   produto sem documento; sem isso a rota retorna `SEARCH_CATALOG_NOT_READY`.
+7. Compare `/api/v1/produtos/search/debug?q=...` autenticado com a rota pública.
 
-Rollback imediato é `SEARCH_RANKING_PERCENTAGE=0`. A remoção estrutural é posterior e usa
-`npm run db:rollback`, somente depois da janela de recuperação. DDL InnoDB/MariaDB pode fazer
-commit implícito; não trate rollback SQL como substituto de backup.
+O rollback estrutural usa `npm run db:rollback`, somente depois da janela de recuperação. DDL
+InnoDB/MariaDB pode fazer commit implícito; não trate rollback SQL como substituto de backup.
 
 ## API
 

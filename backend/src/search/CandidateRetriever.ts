@@ -10,14 +10,10 @@ export class CandidateRetriever {
   static async retrieve(empresaId: number, parsed: ParsedSearchQuery, filters: SearchFilters): Promise<SearchCandidate[]> {
     const booleanQuery = buildSafeBooleanQuery([...parsed.tokens, ...parsed.synonyms]);
     const candidateLimit = Math.min(Number(process.env.SEARCH_CANDIDATE_LIMIT || SEARCH_LIMITS.candidateLimit), 1000);
-    const type = parsed.productType?.value || '';
     const material = filters.material || parsed.materials[0] || '';
     const color = filters.color || parsed.colors[0] || '';
     const capacity = parsed.measurements.capacityMl || null;
     const structuredConstraint = parsed.constraints.find((constraint) => !['material', 'color', 'capacity_ml'].includes(constraint.key));
-    const containsConstraint = parsed.constraints.find((constraint) => constraint.key.startsWith('contains:'));
-    const containsType = containsConstraint?.key.slice('contains:'.length) || '';
-    const containsQuantity = containsConstraint ? Number(containsConstraint.value) : null;
     const structuredText = typeof structuredConstraint?.value === 'string' ? structuredConstraint.value : '';
     const structuredNumber = typeof structuredConstraint?.value === 'number' ? structuredConstraint.value : null;
     const structuredBoolean = typeof structuredConstraint?.value === 'boolean' ? Number(structuredConstraint.value) : null;
@@ -27,13 +23,13 @@ export class CandidateRetriever {
     const categoryValues = filters.categoryId ? [filters.categoryId] : [];
     const sql = `
       WITH candidate_ids AS (
+        /* FULLTEXT is the candidate entrance. Structured attributes only rescue
+           terms deliberately not indexed by MariaDB (for example A4/A5). */
         SELECT psd.id_produto FROM product_search_documents psd
-        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND psd.canonical_product_type = ?
+        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE)
         UNION DISTINCT
-        SELECT pct.id_produto FROM product_contains_types pct WHERE pct.id_empresa = ? AND pct.canonical_product_type = ?
-        UNION DISTINCT
-        SELECT pct.id_produto FROM product_contains_types pct WHERE pct.id_empresa = ? AND pct.canonical_product_type = ?
-          AND (? IS NULL OR pct.quantity = ?)
+        SELECT psd.id_produto FROM product_search_documents psd
+        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.search_text) AGAINST (? IN BOOLEAN MODE)
         UNION DISTINCT
         SELECT psa.id_produto FROM product_search_attributes psa
         INNER JOIN search_attribute_definitions sad ON sad.id_empresa = psa.id_empresa AND sad.id = psa.attribute_definition_id
@@ -42,14 +38,6 @@ export class CandidateRetriever {
         UNION DISTINCT
         SELECT psd.id_produto FROM product_search_documents psd WHERE psd.id_empresa = ? AND psd.is_public = 1
           AND ((? <> '' AND psd.material_key = ?) OR (? <> '' AND psd.color_key = ?) OR (? IS NOT NULL AND psd.capacity_ml = ?))
-        UNION DISTINCT
-        SELECT psd.id_produto FROM product_search_documents psd
-        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE)
-        UNION DISTINCT
-        SELECT psd.id_produto FROM product_search_documents psd
-        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.search_text) AGAINST (? IN BOOLEAN MODE)
-        UNION DISTINCT
-        SELECT p0.id_produto FROM produtos p0 WHERE p0.id_empresa = ? AND p0.site = 'S' AND p0.habilitado = 'S' AND p0.codigo LIKE ?
       )
       SELECT ${SITE_PRODUTO_COLUMNS_P}, psd.name_search, psd.search_text, psd.canonical_product_type,
         psd.capacity_ml, psd.material_key, psd.color_key, psd.popularity_score,
@@ -62,11 +50,10 @@ export class CandidateRetriever {
       ${categoryJoin}
       WHERE (? = '' OR psd.material_key = ?) AND (? = '' OR psd.color_key = ?) AND (? IS NULL OR psd.capacity_ml = ?)
       ORDER BY fulltext_name_score DESC, fulltext_search_score DESC, p.id_produto DESC LIMIT ?`;
-    const values = [empresaId, type, empresaId, type, empresaId, containsType, containsQuantity, containsQuantity,
+    const values = [empresaId, booleanQuery, empresaId, booleanQuery,
       empresaId, structuredConstraint?.key || '', structuredText, structuredText,
       structuredNumber, structuredNumber, structuredBoolean, structuredBoolean, empresaId, material, material, color, color, capacity, capacity,
-      empresaId, booleanQuery, empresaId, booleanQuery,
-      empresaId, `%${parsed.normalized}%`, booleanQuery, booleanQuery, parsed.normalized, empresaId, ...categoryValues,
+      booleanQuery, booleanQuery, parsed.normalized, empresaId, ...categoryValues,
       material, material, color, color, capacity, capacity, candidateLimit];
     const rows = await query(sql, values) as Array<SearchCandidate & { contained_types?: string }>;
     if (!rows.length) return [];
