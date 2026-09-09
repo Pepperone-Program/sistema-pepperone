@@ -7,10 +7,10 @@ describe.skipIf(process.env.SEARCH_LIVE_INTEGRATION !== 'true')('live public sea
 
   it.each(['bloco', 'garrafa', 'caneta metalica'])('returns relevant primary products first for %s', async (query) => {
     const result = await PublicSiteSearchService.search({ empresaId: 1, query, page: 1, limit: 10, sort: 'relevance', filters: {} });
-    expect(result.items).toHaveLength(10);
+    expect(result.items.length).toBeGreaterThan(0);
     const primaryTerm = query.split(' ')[0];
-    expect(result.items.slice(0, 5).every((product) => product.produto.toLocaleLowerCase('pt-BR').includes(primaryTerm))).toBe(true);
-    expect(result.rankingVersion).toContain('v1');
+    expect(result.items.every((product) => product.produto.toLocaleLowerCase('pt-BR').includes(primaryTerm))).toBe(true);
+    expect(result.rankingVersion).toContain('v4');
   });
 
   it('ranks the requested phrase before contradictory products', async () => {
@@ -24,5 +24,12 @@ describe.skipIf(process.env.SEARCH_LIVE_INTEGRATION !== 'true')('live public sea
     const withoutLines = await PublicSiteSearchService.search({ empresaId: 1, query: 'bloco sem pauta', page: 1, limit: 100, sort: 'relevance', filters: {} });
     expect(withLines.items.some((product) => /sem pauta/i.test(product.produto))).toBe(false);
     expect(withoutLines.items.some((product) => /com pauta/i.test(product.produto))).toBe(false);
+  });
+
+  it('returns cafe only when cafe starts a word in the product title', async () => {
+    const result = await PublicSiteSearchService.search({ empresaId: 1, query: 'café', page: 1, limit: 100, sort: 'relevance', filters: {} });
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items.every((product) => /(^|\s)cafe/i.test(product.produto.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))).toBe(true);
+    expect(result.items.some((product) => /^(bloco|kit home office|kit escritorio)\b/i.test(product.produto))).toBe(false);
   });
 });

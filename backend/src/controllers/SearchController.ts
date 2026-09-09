@@ -52,7 +52,8 @@ export class SearchController {
       const priority = Math.max(-10000, Math.min(10000, Number(req.body.priority || 0)));
       await query(`INSERT INTO search_dictionary (id_empresa,term,normalized_term,type,canonical_value,priority,relation_type,strength,active,version)
         VALUES (?,?,?,?,?,?,?,?,?,1) ON DUPLICATE KEY UPDATE term=VALUES(term),priority=VALUES(priority),relation_type=VALUES(relation_type),
-        strength=VALUES(strength),active=VALUES(active),version=version+1`, [empresaId, term, normalizedTerm, type, canonicalValue, priority, relation, strength, req.body.active === false ? 0 : 1]);
+        type=VALUES(type),canonical_value=VALUES(canonical_value),strength=VALUES(strength),active=VALUES(active),version=version+1`,
+      [empresaId, term, normalizedTerm, type, canonicalValue, priority, relation, strength, req.body.active === false ? 0 : 1]);
       await CacheService.invalidateNamespaces(['search', 'search-v2']);
       successResponse(res, { normalized_term: normalizedTerm, canonical_value: canonicalValue }, 'Dicionario atualizado');
     } catch (error) { const err = error as Error; errorResponse(res, 'DICTIONARY_ERROR', err.message, 500); }

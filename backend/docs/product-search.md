@@ -10,21 +10,22 @@ catálogo público, responde `SEARCH_CATALOG_NOT_READY` em vez de entregar relev
 A busca administrativa por ID, código ou nome permanece inalterada. Código exato e a variação
 com prefixo `PEP` continuam tendo precedência.
 
-O preflight de 2026-08-27 identificou MariaDB 10.3.39, servidor `latin1_swedish_ci`, token
-FULLTEXT mínimo 3, 2.820 produtos e 2.771 produtos públicos na empresa 1. Por isso A4, A5,
+O preflight de 2026-09-08 identificou MariaDB 10.3.39, servidor `latin1_swedish_ci`, token
+FULLTEXT mínimo 3, 2.824 produtos e 2.754 produtos públicos na empresa 1. Por isso A4, A5,
 UV e PC não dependem de FULLTEXT: são recuperados por atributos estruturados. O documento
 de busca usa `utf8mb4_unicode_ci` sem alterar a tabela legada.
 
 ## Arquitetura
 
-Fluxo: normalização → dicionário → parser determinístico → recuperação de até 300 candidatos
-→ ranking explicável → separação de relacionados → cursor assinado → resposta/cache/analytics.
+Fluxo: normalização → dicionário → parser determinístico → recuperação FULLTEXT pelo título
+→ validação estrita → ranking explicável → paginação → hidratação dos produtos/imagens
+→ cursor assinado → resposta/cache/analytics.
 
 O ranking compara, nesta ordem, tipo principal, contradições, constraints atendidas, score
 composto, popularidade e ID estável. Antes da resposta, um gate exige tipo, termos e atributos
-fortes compatíveis. Kits que apenas contêm o tipo nunca entram no grupo principal: podem compor
-somente a cauda final, limitada a 10% dos resultados principais e inexistente abaixo de dez
-resultados principais. Contradições confiáveis são excluídas.
+fortes compatíveis. Correspondências encontradas somente em descrição e kits que apenas contêm o
+tipo pesquisado não são retornados. Contradições confiáveis são excluídas; não existe cauda de
+resultados secundários.
 
 O parser reconhece frases antes de stopwords, capacidades em ml/l, polegadas, tamanhos A4/A5/A6,
 materiais, cores e negações. Operadores Boolean FULLTEXT nunca vêm diretamente do cliente.
@@ -60,8 +61,8 @@ persistida se `SEARCH_STORE_NORMALIZED_QUERY=true`; por padrão analytics armaze
 
 ## Testes e qualidade
 
-`npm test` cobre normalização, frases, unidades, injection, cursor, feature flag, invariantes de
-ranking e um corpus sintético determinístico de 150 consultas. Esse corpus não substitui o golden
+`npm test` cobre normalização, frases, unidades, injection, cursor, relevância estrita, invariantes
+de ranking e um corpus sintético determinístico de 150 consultas. Esse corpus não substitui o golden
 dataset adjudicado com IDs reais: a aprovação/anomização do catálogo é um gate antes de 100%.
 
 O teste k6 está em `load/search.k6.js`. Exemplo:
@@ -78,7 +79,7 @@ de capacidade. Alertas externos devem consumir logs `[ProductSearch]` e métrica
 
 - Não houve migration, backfill, benchmark k6 ou tráfego real nesta implementação.
 - A métrica autenticada é uma janela local por processo; agregação/alertas dependem da plataforma.
-- A composição de kits e atributos confiáveis exigem curadoria administrativa/importação. Inferências
+- Sinônimos e atributos confiáveis exigem curadoria administrativa/importação. Inferências
   do nome/descrição são marcadas `DERIVED` e nunca sobrescrevem valores `MANUAL`.
 - O write path sincroniza após a gravação legada quando habilitado. Uma futura refatoração deverá
   colocar produto e documento na mesma transação; até lá, o rebuild por hash é o reparo idempotente.

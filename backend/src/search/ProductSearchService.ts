@@ -10,8 +10,9 @@ import { QueryParser } from './QueryParser';
 import { decodeSearchCursor, encodeSearchCursor } from './SearchCursorCodec';
 import { SearchAnalyticsService } from './SearchAnalyticsService';
 import { SearchObservability } from './SearchObservability';
-import { splitRelevantCandidates } from './SearchRelevanceFilter';
+import { filterRelevantCandidates } from './SearchRelevanceFilter';
 import { SearchCatalogReadiness } from './SearchCatalogReadiness';
+import { normalizeSearchQuery } from './QueryNormalizer';
 
 const afterCursor = (item: RankedSearchCandidate, cursor: ReturnType<typeof decodeSearchCursor>): boolean => {
   if (!cursor) return true;
@@ -27,11 +28,13 @@ export class ProductSearchService {
     const started = performance.now();
     const searchId = randomUUID();
     const parserStarted = performance.now();
+    if (normalizeSearchQuery(options.query).normalized.length < SEARCH_LIMITS.minLength) {
+      throw Object.assign(new Error('Informe ao menos 2 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
+    }
+    await SearchCatalogReadiness.assertReady(options.empresaId);
     const dictionary = await DictionaryService.listActive(options.empresaId);
     const parsed = QueryParser.parse(options.query, dictionary);
     const parserMs = performance.now() - parserStarted;
-    if (parsed.normalized.length < SEARCH_LIMITS.minLength) throw Object.assign(new Error('Informe ao menos 2 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
-    await SearchCatalogReadiness.assertReady(options.empresaId);
     const databaseStarted = performance.now();
     const candidates = await CandidateRetriever.retrieve(options.empresaId, parsed, options.filters);
     const databaseMs = performance.now() - databaseStarted;
@@ -46,20 +49,28 @@ export class ProductSearchService {
     }
     const cursor = options.cursor ? decodeSearchCursor(options.cursor) : null;
     if (options.cursor && (!cursor || cursor.version !== SEARCH_RANKING_VERSION)) throw Object.assign(new Error('Cursor de busca invalido ou expirado'), { code: 'INVALID_CURSOR', statusCode: 400 });
-    const buckets = splitRelevantCandidates(parsed, ranked);
-    const ordered = [...buckets.primary, ...buckets.tail];
+    const ordered = filterRelevantCandidates(parsed, ranked);
     const filtered = ordered.filter((item) => afterCursor(item, cursor));
     const offset = cursor ? 0 : (options.page - 1) * options.limit;
     const pageItems = filtered.slice(offset, offset + options.limit);
-    const imagesByProduct = await ProdutoModel.findImagesByProductIds(pageItems.map((item) => Number(item.product.id_produto)));
-    const toProduct = (item: RankedSearchCandidate): Produto => ({ ...item.product, imagens: imagesByProduct.get(Number(item.product.id_produto)) || [] });
+    const pageIds = pageItems.map((item) => Number(item.product.id_produto));
+    const [products, imagesByProduct] = await Promise.all([
+      ProdutoModel.findByIdsForSite(options.empresaId, pageIds),
+      ProdutoModel.findImagesByProductIds(pageIds),
+    ]);
+    const productsById = new Map(products.map((product) => [Number(product.id_produto), product]));
+    const hydratedProducts = pageItems.flatMap((item): Produto[] => {
+      const productId = Number(item.product.id_produto);
+      const product = productsById.get(productId);
+      return product ? [{ ...product, imagens: imagesByProduct.get(productId) || [] }] : [];
+    });
     const last = pageItems[pageItems.length - 1];
     const nextCursor = last && filtered.length > offset + pageItems.length ? encodeSearchCursor({ version: SEARCH_RANKING_VERSION, group: last.group,
       matchedConstraints: last.matchedConstraints, contradictions: last.contradictions, score: last.score.total, productId: Number(last.product.id_produto) }) : null;
     const rankingMs = performance.now() - rankingStarted;
     const totalMs = performance.now() - started;
     const result: SearchResult = { searchId, rankingVersion: SEARCH_RANKING_VERSION,
-      results: pageItems.map(toProduct), relatedResults: [], total: ordered.length, limit: options.limit, nextCursor, fallback: false };
+      results: hydratedProducts, total: ordered.length, limit: options.limit, nextCursor, fallback: false };
     SearchObservability.log(searchId, options.empresaId, SEARCH_RANKING_VERSION, { databaseMs, parserMs, rankingMs, totalMs, candidateCount: candidates.length, resultCount: pageItems.length, fallback: false });
     await SearchAnalyticsService.record({ searchId, empresaId: options.empresaId, rankingVersion: SEARCH_RANKING_VERSION,
       normalizedQuery: parsed.normalized, filters: options.filters, resultCount: pageItems.length, candidateCount: candidates.length,
@@ -72,9 +83,11 @@ export class ProductSearchService {
     const parsed = QueryParser.parse(options.query, dictionary);
     const candidates = await CandidateRetriever.retrieve(options.empresaId, parsed, options.filters);
     const ranked = ProductRankingEngine.rank(parsed, candidates);
+    const acceptedIds = new Set(filterRelevantCandidates(parsed, ranked).map((item) => Number(item.product.id_produto)));
     return { rankingVersion: SEARCH_RANKING_VERSION, parsed, candidateCount: candidates.length,
       ranking: ranked.slice(0, options.limit).map((item) => ({ id_produto: item.product.id_produto, produto: item.product.produto,
         group: item.group, matchedConstraints: item.matchedConstraints, totalConstraints: item.totalConstraints,
-        contradictions: item.contradictions, primaryTypeMatch: item.primaryTypeMatch, relatedOnly: item.relatedOnly, score: item.score })) };
+        contradictions: item.contradictions, primaryTypeMatch: item.primaryTypeMatch, relatedOnly: item.relatedOnly,
+        accepted: acceptedIds.has(Number(item.product.id_produto)), score: item.score })) };
   }
 }

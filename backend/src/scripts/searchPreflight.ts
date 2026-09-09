@@ -16,6 +16,9 @@ const run = async (): Promise<void> => {
     ['product_volume', `SELECT id_empresa, COUNT(*) total, SUM(site='S' AND habilitado='S') public_products FROM produtos GROUP BY id_empresa ORDER BY id_empresa`],
     ['product_columns', `SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_KEY,COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='produtos' ORDER BY ORDINAL_POSITION`],
     ['product_indexes', `SELECT INDEX_NAME,NON_UNIQUE,INDEX_TYPE,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) columns_list FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='produtos' GROUP BY INDEX_NAME,NON_UNIQUE,INDEX_TYPE ORDER BY INDEX_NAME`],
+    ['search_schema', `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME IN ('search_dictionary','search_attribute_definitions','product_search_attributes','product_contains_types','product_search_documents','search_events')
+      ORDER BY TABLE_NAME`],
     ['product_ddl', 'SHOW CREATE TABLE produtos'],
     ['legacy_search_explain', `EXPLAIN FORMAT=JSON SELECT id_produto FROM produtos WHERE id_empresa = ? AND site = 'S' AND habilitado = 'S' AND produto LIKE ? ORDER BY data_modificacao DESC LIMIT 20`, [Number(process.env.SEARCH_PREFLIGHT_EMPRESA_ID || 1), '%garrafa%']],
   ];

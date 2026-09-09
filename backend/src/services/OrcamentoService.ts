@@ -3,9 +3,42 @@ import { OrcamentoItemModel } from '@models/OrcamentoItem';
 import { OrcamentoEmailService } from '@services/OrcamentoEmailService';
 import type { Orcamento, CreateOrcamentoDTO, UpdateOrcamentoDTO } from '@/types/orcamento';
 import type { OrcamentoItem, CreateOrcamentoItemDTO } from '@/types/orcamento-item';
+import type { Subcategoria } from '@/types/categoria';
 import { throwError } from '@utils/helpers';
 
 export class OrcamentoService {
+  static async getTopCategoriasOrcadas(empresaId: number): Promise<{
+    items: Array<{
+      id_categoria: number;
+      categoria: string;
+      total: number;
+      subcategorias: Subcategoria[];
+    }>;
+    periodo_dias: 30 | 90;
+  }> {
+    const recent = await OrcamentoModel.findTopCategoriasOrcadas(empresaId, 30);
+    const categorias = recent.length > 0
+      ? recent
+      : await OrcamentoModel.findTopCategoriasOrcadas(empresaId, 90);
+    const subcategorias = await OrcamentoModel.findSubcategoriasByCategorias(
+      empresaId,
+      categorias.map((item) => item.id_categoria)
+    );
+    const subcategoriasByCategoria = new Map<number, Subcategoria[]>();
+    for (const subcategoria of subcategorias) {
+      const list = subcategoriasByCategoria.get(subcategoria.id_categoria) || [];
+      list.push(subcategoria);
+      subcategoriasByCategoria.set(subcategoria.id_categoria, list);
+    }
+
+    return {
+      items: categorias.map((categoria) => ({
+        ...categoria,
+        subcategorias: subcategoriasByCategoria.get(categoria.id_categoria) || [],
+      })),
+      periodo_dias: recent.length > 0 ? 30 : 90,
+    };
+  }
   private static readonly quoteNotificationTimers = new Map<number, NodeJS.Timeout>();
   private static readonly notifiedQuoteIds = new Set<number>();
   private static readonly quoteNotificationDelayMs = Number(

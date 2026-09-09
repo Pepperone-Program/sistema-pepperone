@@ -6,6 +6,12 @@ import { orcamentoSchema, orcamentoItemSchema } from '@utils/validation';
 
 const router = Router();
 
+router.get(
+  '/estatisticas/top-categorias',
+  authMiddleware,
+  OrcamentoController.topCategoriasOrcadas
+);
+
 router.post(
   '/',
   validationMiddleware(orcamentoSchema),

@@ -1,6 +1,7 @@
 import { SEARCH_LIMITS } from '@config/search';
 import type { DictionaryEntry, ParsedSearchQuery, SearchConstraint } from '@/types/search';
 import { normalizeSearchQuery } from './QueryNormalizer';
+import { significantSearchTokens } from './QueryTokenizer';
 
 const COLORS = new Set(['azul', 'preto', 'preta', 'branco', 'branca', 'vermelho', 'vermelha', 'verde', 'amarelo', 'amarela', 'rosa', 'roxo', 'roxa', 'cinza']);
 const MATERIALS: Record<string, string> = { inox: 'stainless_steel', 'aco inox': 'stainless_steel', 'aco inoxidavel': 'stainless_steel', aluminio: 'aluminum', metalica: 'metal', metalico: 'metal', couro: 'leather', plastica: 'plastic', plastico: 'plastic' };
@@ -112,7 +113,7 @@ export class QueryParser {
       consumed.add('termica'); consumed.add('termico');
     }
 
-    const positiveTerms = base.tokens.filter((token) => !consumed.has(token));
+    const positiveTerms = significantSearchTokens(base.tokens.filter((token) => !consumed.has(token)));
     return {
       ...base, productType, constraints: constraints.slice(0, SEARCH_LIMITS.maxConstraints), materials: Array.from(new Set(materials)),
       colors: Array.from(new Set(colors)), measurements, positiveTerms, negativeTerms: [], phrases,

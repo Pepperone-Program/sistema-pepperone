@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeSearchQuery } from '../../src/search/QueryNormalizer';
 import { buildSafeBooleanQuery } from '../../src/search/QueryTokenizer';
 import { QueryParser } from '../../src/search/QueryParser';
+import { buildCandidateBooleanQueries } from '../../src/search/CandidateRetriever';
 
 describe('public product query interpretation', () => {
   it('normalizes unicode, accents, controls and whitespace', () => {
@@ -49,6 +50,17 @@ describe('public product query interpretation', () => {
       canonicalValue: 'caderno', priority: 1, relationType: 'EXACT_SYNONYM', strength: 'STRONG' }]);
     expect(parsed.productType?.value).toBe('caderno');
     expect(parsed.positiveTerms).not.toContain('caderneta');
+  });
+
+  it('queries original and approved synonym independently', () => {
+    const parsed = QueryParser.parse('garrafinha inox', [{ id: 1, term: 'Garrafinha', normalizedTerm: 'garrafinha', type: 'SYNONYM',
+      canonicalValue: 'garrafa', priority: 1, relationType: 'EXACT_SYNONYM', strength: 'STRONG' }]);
+    expect(buildCandidateBooleanQueries(parsed)).toEqual({ booleanQuery: '+garrafinha* +inox*', canonicalQuery: '+garrafa*' });
+  });
+
+  it('removes Portuguese connectors only from free terms', () => {
+    expect(QueryParser.parse('kit para café com pauta').positiveTerms).toEqual(['cafe']);
+    expect(QueryParser.parse('kit para café com pauta').constraints).toContainEqual(expect.objectContaining({ key: 'lined', value: true }));
   });
 
   it.each(["' OR 1=1 --", '++garrafa*', '"garrafa"', 'garrafa) (@@'])('builds safe boolean tokens for %s', (query) => {

@@ -4,6 +4,16 @@ import { OrcamentoService } from '@services/OrcamentoService';
 import { successResponse, paginatedResponse, errorResponse } from '@utils/response';
 
 export class OrcamentoController {
+  static async topCategoriasOrcadas(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const empresaId = req.user?.id_empresa || 1;
+      const result = await OrcamentoService.getTopCategoriasOrcadas(empresaId);
+      successResponse(res, result, 'Categorias mais orcadas listadas com sucesso');
+    } catch (error) {
+      const err = error as any;
+      errorResponse(res, err.code || 'ERROR', err.message, err.statusCode || 500);
+    }
+  }
   static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const empresaId = req.user?.id_empresa || 1;

@@ -1,15 +1,23 @@
 import { SEARCH_LIMITS } from '@config/search';
 import { query } from '@database/connection';
-import { SITE_PRODUTO_COLUMNS_P } from '@models/selectColumns';
 import type { ParsedSearchQuery, SearchCandidate, SearchFilters } from '@/types/search';
-import { buildSafeBooleanQuery } from './QueryTokenizer';
+import { buildSafeBooleanQuery, significantSearchTokens } from './QueryTokenizer';
 
 interface AttributeRow { id_produto: number; attribute_key: string; value_text: string | null; value_number: number | null; value_boolean: number | null }
 
+export const buildCandidateBooleanQueries = (parsed: ParsedSearchQuery): { booleanQuery: string; canonicalQuery: string } => ({
+  booleanQuery: buildSafeBooleanQuery(significantSearchTokens(parsed.tokens)),
+  canonicalQuery: buildSafeBooleanQuery(significantSearchTokens([
+    ...(parsed.productType ? [parsed.productType.value] : []),
+    ...parsed.positiveTerms,
+    ...parsed.synonyms,
+  ])),
+});
+
 export class CandidateRetriever {
   static async retrieve(empresaId: number, parsed: ParsedSearchQuery, filters: SearchFilters): Promise<SearchCandidate[]> {
-    const booleanQuery = buildSafeBooleanQuery([...parsed.tokens, ...parsed.synonyms]);
-    const candidateLimit = Math.min(Number(process.env.SEARCH_CANDIDATE_LIMIT || SEARCH_LIMITS.candidateLimit), 1000);
+    const { booleanQuery, canonicalQuery } = buildCandidateBooleanQueries(parsed);
+    const candidateLimit = Math.min(Math.max(Number(process.env.SEARCH_CANDIDATE_LIMIT || SEARCH_LIMITS.candidateLimit), 100), 5000);
     const material = filters.material || parsed.materials[0] || '';
     const color = filters.color || parsed.colors[0] || '';
     const capacity = parsed.measurements.capacityMl || null;
@@ -29,7 +37,8 @@ export class CandidateRetriever {
         WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE)
         UNION DISTINCT
         SELECT psd.id_produto FROM product_search_documents psd
-        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND MATCH(psd.search_text) AGAINST (? IN BOOLEAN MODE)
+        WHERE psd.id_empresa = ? AND psd.is_public = 1 AND ? <> ''
+          AND MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE)
         UNION DISTINCT
         SELECT psa.id_produto FROM product_search_attributes psa
         INNER JOIN search_attribute_definitions sad ON sad.id_empresa = psa.id_empresa AND sad.id = psa.attribute_definition_id
@@ -39,9 +48,11 @@ export class CandidateRetriever {
         SELECT psd.id_produto FROM product_search_documents psd WHERE psd.id_empresa = ? AND psd.is_public = 1
           AND ((? <> '' AND psd.material_key = ?) OR (? <> '' AND psd.color_key = ?) OR (? IS NOT NULL AND psd.capacity_ml = ?))
       )
-      SELECT ${SITE_PRODUTO_COLUMNS_P}, psd.name_search, psd.search_text, psd.canonical_product_type,
+      SELECT p.id_produto, p.produto, p.codigo, p.data_inclusao,
+        psd.name_search, psd.search_text, psd.canonical_product_type,
         psd.capacity_ml, psd.material_key, psd.color_key, psd.popularity_score,
-        MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE) fulltext_name_score,
+        GREATEST(MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE),
+          MATCH(psd.name_search) AGAINST (? IN BOOLEAN MODE)) fulltext_name_score,
         MATCH(psd.search_text) AGAINST (? IN BOOLEAN MODE) fulltext_search_score,
         CASE WHEN p.codigo = ? THEN 1 ELSE 0 END code_match
       FROM candidate_ids ci
@@ -50,10 +61,10 @@ export class CandidateRetriever {
       ${categoryJoin}
       WHERE (? = '' OR psd.material_key = ?) AND (? = '' OR psd.color_key = ?) AND (? IS NULL OR psd.capacity_ml = ?)
       ORDER BY fulltext_name_score DESC, fulltext_search_score DESC, p.id_produto DESC LIMIT ?`;
-    const values = [empresaId, booleanQuery, empresaId, booleanQuery,
+    const values = [empresaId, booleanQuery, empresaId, canonicalQuery, canonicalQuery,
       empresaId, structuredConstraint?.key || '', structuredText, structuredText,
       structuredNumber, structuredNumber, structuredBoolean, structuredBoolean, empresaId, material, material, color, color, capacity, capacity,
-      booleanQuery, booleanQuery, parsed.normalized, empresaId, ...categoryValues,
+      booleanQuery, canonicalQuery, booleanQuery, parsed.normalized, empresaId, ...categoryValues,
       material, material, color, color, capacity, capacity, candidateLimit];
     const rows = await query(sql, values) as Array<SearchCandidate & { contained_types?: string }>;
     if (!rows.length) return [];

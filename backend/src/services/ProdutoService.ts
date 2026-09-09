@@ -265,6 +265,9 @@ export class ProdutoService {
     if (!success) {
       throwError('DELETE_FAILED', 'Falha ao deletar produto', 500);
     }
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+      await SearchDocumentService.removeProduct(empresaId, produtoId);
+    }
   }
 
   static async getProdutoLinks(empresaId: number, produtoId: number) {

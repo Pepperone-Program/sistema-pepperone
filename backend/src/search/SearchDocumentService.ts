@@ -4,6 +4,7 @@ import type { Produto } from '@/types/produto';
 import { SEARCH_DOCUMENT_VERSION } from '@config/search';
 import { normalizeComparable } from './QueryNormalizer';
 import { QueryParser } from './QueryParser';
+import { SearchCatalogReadiness } from './SearchCatalogReadiness';
 
 const canonicalizeType = (value: string): string | null => {
   const first = normalizeComparable(value).split(' ')[0];
@@ -14,6 +15,23 @@ const canonicalizeType = (value: string): string | null => {
 export class SearchDocumentService {
   static async syncProduct(empresaId: number, product: Produto): Promise<void> {
     await this.syncProducts(empresaId, [product]);
+  }
+
+  static async removeProduct(empresaId: number, productId: number): Promise<void> {
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute('DELETE FROM product_search_attributes WHERE id_empresa = ? AND id_produto = ?', [empresaId, productId]);
+      await connection.execute('DELETE FROM product_contains_types WHERE id_empresa = ? AND id_produto = ?', [empresaId, productId]);
+      await connection.execute('DELETE FROM product_search_documents WHERE id_empresa = ? AND id_produto = ?', [empresaId, productId]);
+      await connection.commit();
+      SearchCatalogReadiness.clearCache();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   static async syncProducts(empresaId: number, products: Produto[]): Promise<void> {
@@ -89,6 +107,7 @@ export class SearchDocumentService {
         confidence=IF(source='MANUAL',confidence,VALUES(confidence)), source=IF(source='MANUAL',source,VALUES(source))`, containsRows.flat());
     }
       await connection.commit();
+      SearchCatalogReadiness.clearCache();
     } catch (error) {
       await connection.rollback();
       throw error;

@@ -53,7 +53,7 @@ export interface ParsedSearchQuery extends NormalizedSearchQuery {
   synonyms: string[];
 }
 
-export interface SearchCandidate extends Produto {
+export interface SearchCandidate extends Pick<Produto, 'id_produto' | 'produto' | 'codigo' | 'data_inclusao'> {
   name_search: string;
   search_text: string;
   canonical_product_type: string | null;
@@ -133,7 +133,6 @@ export interface SearchResult {
   searchId: string;
   rankingVersion: string;
   results: Produto[];
-  relatedResults: Produto[];
   total: number;
   limit: number;
   nextCursor: string | null;

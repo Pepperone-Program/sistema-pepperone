@@ -6,11 +6,11 @@ export const SEARCH_LIMITS = {
   maxConstraints: 12,
   maxPage: 100,
   maxLimit: 100,
-  candidateLimit: 300,
+  candidateLimit: 3000,
 } as const;
 
-export const SEARCH_RANKING_VERSION = process.env.SEARCH_RANKING_VERSION || 'v3';
-export const SEARCH_DOCUMENT_VERSION = 2;
+export const SEARCH_RANKING_VERSION = process.env.SEARCH_RANKING_VERSION || 'v4';
+export const SEARCH_DOCUMENT_VERSION = 3;
 export const SEARCH_CACHE_TTL_SECONDS = Number(process.env.SEARCH_CACHE_TTL_SECONDS || 300);
 
 export const SEARCH_WEIGHTS = {

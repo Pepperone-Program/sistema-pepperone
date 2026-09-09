@@ -13,7 +13,7 @@ export interface SiteSearchPage {
 }
 
 const advancedToPage = (result: SearchResult, options: PublicSearchOptions): SiteSearchPage => ({
-  items: [...result.results, ...result.relatedResults], total: result.total, page: options.page,
+  items: result.results, total: result.total, page: options.page,
   limit: options.limit, rankingVersion: result.rankingVersion, searchId: result.searchId, nextCursor: result.nextCursor,
 });
 

@@ -1,8 +1,64 @@
 import { query } from '@database/connection';
 import type { Orcamento, CreateOrcamentoDTO, UpdateOrcamentoDTO } from '@/types/orcamento';
+import type { Subcategoria } from '@/types/categoria';
 import { ORCAMENTO_COLUMNS } from './selectColumns';
 
 export class OrcamentoModel {
+  static async findSubcategoriasByCategorias(
+    empresaId: number,
+    categoriaIds: number[]
+  ): Promise<Subcategoria[]> {
+    if (categoriaIds.length === 0) return [];
+
+    const placeholders = categoriaIds.map(() => '?').join(', ');
+    const sql = `
+      SELECT id_empresa, id_categoria, id_subcategoria, subcategoria,
+             descricao, icon, habilitado, ordem
+      FROM subcategorias
+      WHERE id_empresa = ?
+        AND id_categoria IN (${placeholders})
+        AND habilitado = 'S'
+      ORDER BY id_categoria ASC, ordem ASC, subcategoria ASC, id_subcategoria ASC
+    `;
+
+    const rows = await query(sql, [empresaId, ...categoriaIds]);
+    return rows as Subcategoria[];
+  }
+
+  static async findTopCategoriasOrcadas(
+    empresaId: number,
+    days: 30 | 90
+  ): Promise<Array<{ id_categoria: number; categoria: string; total: number }>> {
+    const sql = `
+      SELECT
+        c.id_categoria,
+        c.categoria,
+        COUNT(*) AS total
+      FROM orcamentos o
+      INNER JOIN orcamentos_itens oi ON oi.id_orcamento = o.id_orcamento
+      INNER JOIN aux_categorias_produtos acp
+        ON acp.id_empresa = o.id_empresa
+       AND acp.id_produto = oi.id_produto
+      INNER JOIN categorias c
+        ON c.id_empresa = acp.id_empresa
+       AND c.id_categoria = acp.id_categoria
+      WHERE o.id_empresa = ?
+        AND o.data_orcamento >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ${days} DAY)
+        AND c.habilitado = 'S'
+      GROUP BY c.id_categoria, c.categoria
+      ORDER BY total DESC, c.categoria ASC, c.id_categoria ASC
+      LIMIT 5
+    `;
+
+    const rows = await query(sql, [empresaId]);
+    return (rows as Array<{ id_categoria: number; categoria: string; total: number }>).map(
+      (row) => ({
+        id_categoria: Number(row.id_categoria),
+        categoria: row.categoria,
+        total: Number(row.total),
+      })
+    );
+  }
   static async create(
     empresaId: number,
     data: CreateOrcamentoDTO

@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { createHash } from 'crypto';
 import { AuthenticatedRequest } from '@middleware/auth';
 import { CacheService } from '@services/CacheService';
 import { ProdutoService } from '@services/ProdutoService';
@@ -7,6 +8,8 @@ import { normalizeSearchQuery } from '@/search/QueryNormalizer';
 import { SEARCH_CACHE_TTL_SECONDS, SEARCH_LIMITS, SEARCH_RANKING_VERSION } from '@config/search';
 import type { SearchSort } from '@/types/search';
 import { PublicSiteSearchService } from '@/search/PublicSiteSearchService';
+import { DictionaryService } from '@/search/DictionaryService';
+import { SearchCatalogReadiness } from '@/search/SearchCatalogReadiness';
 import { successResponse, paginatedResponse, errorResponse } from '@utils/response';
 
 const productCacheNamespaces = [
@@ -21,6 +24,18 @@ const productCacheNamespaces = [
 
 async function invalidateProductCaches(): Promise<void> {
   await CacheService.invalidateNamespaces(productCacheNamespaces);
+}
+
+async function publicSearchCacheKey(empresaId: number, term: string, page: number, limit: number, cursor?: string): Promise<string> {
+  const normalizedTerm = normalizeSearchQuery(term).normalized;
+  if (normalizedTerm.length < SEARCH_LIMITS.minLength) {
+    throw Object.assign(new Error('Informe ao menos 2 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
+  }
+  await SearchCatalogReadiness.assertReady(empresaId);
+  const dictionaryVersion = await DictionaryService.version(empresaId);
+  const cursorHash = cursor ? createHash('sha256').update(cursor).digest('hex').slice(0, 16) : 'none';
+  return CacheService.buildKey('search-v2', [empresaId, SEARCH_RANKING_VERSION, dictionaryVersion,
+    normalizedTerm, page, limit, cursorHash].join(':'));
 }
 
 export class ProdutoController {
@@ -123,7 +138,7 @@ export class ProdutoController {
           return;
         }
         const sessionId = String(req.headers['x-search-session-id'] || '');
-        const cacheKey = CacheService.buildKey('search-v2', `${empresaId}:${SEARCH_RANKING_VERSION}:${normalizeSearchQuery(search).normalized}:${safePage}:${safeLimit}`);
+        const cacheKey = await publicSearchCacheKey(empresaId, search, safePage, safeLimit);
         const result = await CacheService.getOrSet(cacheKey, () => PublicSiteSearchService.search({
           empresaId, query: search, page: safePage, limit: safeLimit, sort: 'relevance', filters: {}, sessionId,
         }), SEARCH_CACHE_TTL_SECONDS);
@@ -177,9 +192,10 @@ export class ProdutoController {
         errorResponse(res, 'UNAVAILABLE_SORT', 'Esta ordenacao ainda nao esta disponivel no contrato publico', 422);
         return;
       }
-      const cacheKey = CacheService.buildKey('search-v2', `${empresaId}:${SEARCH_RANKING_VERSION}:${normalizeSearchQuery(term).normalized}:${page}:${limit}`);
+      const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+      const cacheKey = await publicSearchCacheKey(empresaId, term, page, limit, cursor);
       const result = await CacheService.getOrSet(cacheKey, () => PublicSiteSearchService.search({
-        empresaId, query: term, page, limit, cursor: req.query.cursor ? String(req.query.cursor) : undefined,
+        empresaId, query: term, page, limit, cursor,
         sort: requestedSort, filters: {}, sessionId,
       }), SEARCH_CACHE_TTL_SECONDS);
       successResponse(res, {
