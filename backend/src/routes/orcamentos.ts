@@ -8,7 +8,6 @@ const router = Router();
 
 router.get(
   '/estatisticas/top-categorias',
-  authMiddleware,
   OrcamentoController.topCategoriasOrcadas
 );
 
