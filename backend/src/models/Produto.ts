@@ -417,7 +417,7 @@ export class ProdutoModel {
     const total = (countResult as any[])[0].total;
 
     const offset = (page - 1) * limit;
-    const sql = `SELECT ${SITE_PRODUTO_COLUMNS} ${where} ORDER BY data_modificacao DESC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${SITE_PRODUTO_COLUMNS} ${where} ORDER BY data_modificacao DESC, id_produto DESC LIMIT ? OFFSET ?`;
     values.push(limit, offset);
 
     const items = await query(sql, values);

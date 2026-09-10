@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../src/services/ProdutoService', () => ({ ProdutoService: { findExactProductCodeForSite: vi.fn() } }));
+vi.mock('../../src/services/ProdutoService', () => ({ ProdutoService: { findExactProductCodeForSite: vi.fn(), listProdutosSite: vi.fn() } }));
 vi.mock('../../src/models/Produto', () => ({ ProdutoModel: {
   searchByCodigoLikeForSite: vi.fn(), findImagesByProductIds: vi.fn(),
 } }));
@@ -29,7 +29,25 @@ beforeEach(() => {
 });
 
 describe('literal code search precedence', () => {
-  it.each(['PEP', 'pep', 'CM', 'ket1001'])('returns code matches for %s without requiring the index', async (query) => {
+  it.each(['pep', 'PEP', ' PeP '])('lists the entire public catalog first for %s', async (query) => {
+    const items = [{ id_produto: 99, codigo: 'CM001' }] as any;
+    vi.mocked(ProdutoService.listProdutosSite).mockResolvedValue({ items, total: 3500, page: 102, limit: 10 });
+    const result = await PublicSiteSearchService.search({ ...options(query), empresaId: 7, page: 102 });
+    expect(ProdutoService.listProdutosSite).toHaveBeenCalledWith(7, 102, 10);
+    expect(result).toMatchObject({ items, total: 3500, page: 102, limit: 10, nextCursor: null });
+    expect(result.exactProduct).toBeUndefined();
+    expect(ProdutoService.findExactProductCodeForSite).not.toHaveBeenCalled();
+    expect(ProdutoModel.searchByCodigoLikeForSite).not.toHaveBeenCalled();
+    expect(SearchCatalogReadiness.assertReady).not.toHaveBeenCalled();
+    expect(ProductSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('rejects cursors for the full catalog', async () => {
+    await expect(PublicSiteSearchService.search({ ...options('pep'), cursor: 'old' }))
+      .rejects.toMatchObject({ code: 'INVALID_CURSOR' });
+  });
+
+  it.each(['CM', 'ket1001'])('returns code matches for %s without requiring the index', async (query) => {
     const item = { id_produto: 1, codigo: 'PEPKET1001' } as any;
     vi.mocked(ProdutoModel.searchByCodigoLikeForSite).mockResolvedValue({ items: [item], total: 3510 });
     const result = await PublicSiteSearchService.search({ ...options(query), page: 2 });

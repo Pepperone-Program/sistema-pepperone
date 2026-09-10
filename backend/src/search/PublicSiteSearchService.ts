@@ -31,6 +31,13 @@ export class PublicSiteSearchService {
     if (term.length < SEARCH_LIMITS.minLength || term.length > SEARCH_LIMITS.maxLength) {
       throw Object.assign(new Error('Informe entre 2 e 200 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
     }
+    if (term.toLowerCase() === 'pep') {
+      if (options.cursor) {
+        throw Object.assign(new Error('Catalogo completo utiliza page e limit, sem cursor'), { code: 'INVALID_CURSOR', statusCode: 400 });
+      }
+      const catalog = await ProdutoService.listProdutosSite(options.empresaId, options.page, options.limit);
+      return { ...catalog, rankingVersion: `${SEARCH_RANKING_VERSION}-full-catalog-pep-v1`, nextCursor: null };
+    }
     const exact = await ProdutoService.findExactProductCodeForSite(options.empresaId, term);
     const codes = exact ? { items: [exact], total: 1 } : await ProdutoModel.searchByCodigoLikeForSite(
       options.empresaId, term, options.page, options.limit,
