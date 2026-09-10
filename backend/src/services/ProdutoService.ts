@@ -65,7 +65,7 @@ export class ProdutoService {
       throwError('CREATE_FAILED', 'Falha ao criar produto', 500);
     }
 
-    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
       await SearchDocumentService.syncProduct(empresaId, produto as Produto);
     }
     return produto as Produto;
@@ -155,11 +155,7 @@ export class ProdutoService {
       throwError('INVALID_SEARCH', 'Informe o termo de busca em q', 400);
     }
 
-    const exactCodeMatch =
-      (await ProdutoModel.searchByCodigoForSite(empresaId, normalizedTerm)) ||
-      (!normalizedTerm.toUpperCase().startsWith('PEP')
-        ? await ProdutoModel.searchByCodigoForSite(empresaId, `PEP${normalizedTerm}`)
-        : null);
+    const exactCodeMatch = await this.findExactProductCodeForSite(empresaId, normalizedTerm);
     if (exactCodeMatch) {
       const [produtoComImagens] = await this.attachImages([exactCodeMatch]);
       const [produtoCompleto] = await this.attachCategories(empresaId, [produtoComImagens]);
@@ -206,11 +202,8 @@ export class ProdutoService {
   ): Promise<(Produto & { match_exato_codigo: true }) | null> {
     const normalizedTerm = term.trim();
     if (!normalizedTerm) return null;
-    const exact = (await ProdutoModel.searchByCodigoForSite(empresaId, normalizedTerm)) ||
-      (!normalizedTerm.toUpperCase().startsWith('PEP')
-        ? await ProdutoModel.searchByCodigoForSite(empresaId, `PEP${normalizedTerm}`)
-        : null);
-    if (!exact) return null;
+    const exact = await ProdutoModel.searchByCodigoForSite(empresaId, normalizedTerm);
+    if (!exact || exact.codigo.toLowerCase() !== normalizedTerm.toLowerCase()) return null;
     const [withImages] = await this.attachImages([exact]);
     const [complete] = await this.attachCategories(empresaId, [withImages]);
     return { ...complete, match_exato_codigo: true };
@@ -244,7 +237,7 @@ export class ProdutoService {
       throwError('UPDATE_FAILED', 'Falha ao atualizar produto', 500);
     }
 
-    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
       await SearchDocumentService.syncProduct(empresaId, updated as Produto);
     }
     return updated as Produto;
@@ -265,7 +258,7 @@ export class ProdutoService {
     if (!success) {
       throwError('DELETE_FAILED', 'Falha ao deletar produto', 500);
     }
-    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED === 'true') {
+    if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
       await SearchDocumentService.removeProduct(empresaId, produtoId);
     }
   }

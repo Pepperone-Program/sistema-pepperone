@@ -4,6 +4,9 @@ export interface Categoria {
   id_empresa: number;
   id_categoria: number;
   categoria: string;
+  titulo_h1: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
   descricao: string | null;
   icon: string | null;
   habilitado: HabilitadoFlag;
@@ -36,6 +39,9 @@ export interface SubcategoriaProduto {
 export interface CreateCategoriaDTO {
   id_categoria?: number;
   categoria: string;
+  titulo_h1?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
   descricao?: string | null;
   icon?: string | null;
   habilitado?: HabilitadoFlag;

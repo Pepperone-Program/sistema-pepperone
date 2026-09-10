@@ -102,6 +102,9 @@ export const usuarioSchema = Joi.object({
 export const categoriaSchema = Joi.object({
   id_categoria: Joi.number().integer().min(0).optional(),
   categoria: Joi.string().max(255).required(),
+  titulo_h1: Joi.string().max(255).allow(null, ''),
+  meta_title: Joi.string().max(255).allow(null, ''),
+  meta_description: Joi.string().allow(null, ''),
   descricao: Joi.string().allow(null, ''),
   icon: Joi.string().max(5000).allow(null, ''),
   habilitado: Joi.string().valid('S', 'N').allow(null, '').default('S'),

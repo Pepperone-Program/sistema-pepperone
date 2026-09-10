@@ -1,15 +1,11 @@
 import { Response } from 'express';
-import { createHash } from 'crypto';
 import { AuthenticatedRequest } from '@middleware/auth';
 import { CacheService } from '@services/CacheService';
 import { ProdutoService } from '@services/ProdutoService';
 import { ProdutoImageService } from '@services/ProdutoImageService';
-import { normalizeSearchQuery } from '@/search/QueryNormalizer';
-import { SEARCH_CACHE_TTL_SECONDS, SEARCH_LIMITS, SEARCH_RANKING_VERSION } from '@config/search';
+import { SEARCH_LIMITS } from '@config/search';
 import type { SearchSort } from '@/types/search';
 import { PublicSiteSearchService } from '@/search/PublicSiteSearchService';
-import { DictionaryService } from '@/search/DictionaryService';
-import { SearchCatalogReadiness } from '@/search/SearchCatalogReadiness';
 import { successResponse, paginatedResponse, errorResponse } from '@utils/response';
 
 const productCacheNamespaces = [
@@ -24,18 +20,6 @@ const productCacheNamespaces = [
 
 async function invalidateProductCaches(): Promise<void> {
   await CacheService.invalidateNamespaces(productCacheNamespaces);
-}
-
-async function publicSearchCacheKey(empresaId: number, term: string, page: number, limit: number, cursor?: string): Promise<string> {
-  const normalizedTerm = normalizeSearchQuery(term).normalized;
-  if (normalizedTerm.length < SEARCH_LIMITS.minLength) {
-    throw Object.assign(new Error('Informe ao menos 2 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
-  }
-  await SearchCatalogReadiness.assertReady(empresaId);
-  const dictionaryVersion = await DictionaryService.version(empresaId);
-  const cursorHash = cursor ? createHash('sha256').update(cursor).digest('hex').slice(0, 16) : 'none';
-  return CacheService.buildKey('search-v2', [empresaId, SEARCH_RANKING_VERSION, dictionaryVersion,
-    normalizedTerm, page, limit, cursorHash].join(':'));
 }
 
 export class ProdutoController {
@@ -127,21 +111,13 @@ export class ProdutoController {
       const search = String(req.query.busca || req.query.search || '').trim() || undefined;
 
       if (search) {
-        const safePage = Math.min(Math.max(page, 1), SEARCH_LIMITS.maxPage);
+        const safePage = Number.isSafeInteger(page) && page > 0 ? page : 1;
         const safeLimit = Math.min(Math.max(limit, 1), SEARCH_LIMITS.maxLimit);
-        const exactCode = await ProdutoService.findExactProductCodeForSite(empresaId, search);
-        if (exactCode) {
-          successResponse(res, {
-            items: [exactCode], total: 1, page: 1, limit: safeLimit, totalPages: 1,
-            rankingVersion: `${SEARCH_RANKING_VERSION}-exact-code`,
-          }, 'Produto encontrado por codigo exato');
-          return;
-        }
         const sessionId = String(req.headers['x-search-session-id'] || '');
-        const cacheKey = await publicSearchCacheKey(empresaId, search, safePage, safeLimit);
-        const result = await CacheService.getOrSet(cacheKey, () => PublicSiteSearchService.search({
+        const result = await PublicSiteSearchService.search({
           empresaId, query: search, page: safePage, limit: safeLimit, sort: 'relevance', filters: {}, sessionId,
-        }), SEARCH_CACHE_TTL_SECONDS);
+          cursor: req.query.cursor ? String(req.query.cursor) : undefined,
+        });
         successResponse(res, {
           items: result.items, total: result.total, page: result.page, limit: result.limit,
           totalPages: Math.ceil(result.total / result.limit), rankingVersion: result.rankingVersion,
@@ -178,26 +154,25 @@ export class ProdutoController {
   static async searchSite(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const empresaId = parseInt((req.query.empresaId as string) || '1', 10);
-      const page = Math.min(Math.max(parseInt((req.query.page as string) || '1', 10), 1), SEARCH_LIMITS.maxPage);
+      const parsedPage = parseInt((req.query.page as string) || '1', 10);
+      const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
       const limit = Math.min(Math.max(parseInt((req.query.limit as string) || '100', 10), 1), SEARCH_LIMITS.maxLimit);
       const term = String(req.query.q || req.query.busca || req.query.search || '').trim();
       const sessionId = String(req.headers['x-search-session-id'] || '');
-      const exactCode = await ProdutoService.findExactProductCodeForSite(empresaId, term);
-      if (exactCode) {
-        successResponse(res, exactCode, 'Produto encontrado por codigo exato');
-        return;
-      }
       const requestedSort = String(req.query.sort || 'relevance') as SearchSort;
       if (requestedSort !== 'relevance') {
         errorResponse(res, 'UNAVAILABLE_SORT', 'Esta ordenacao ainda nao esta disponivel no contrato publico', 422);
         return;
       }
       const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
-      const cacheKey = await publicSearchCacheKey(empresaId, term, page, limit, cursor);
-      const result = await CacheService.getOrSet(cacheKey, () => PublicSiteSearchService.search({
+      const result = await PublicSiteSearchService.search({
         empresaId, query: term, page, limit, cursor,
         sort: requestedSort, filters: {}, sessionId,
-      }), SEARCH_CACHE_TTL_SECONDS);
+      });
+      if (result.exactProduct) {
+        successResponse(res, result.exactProduct, 'Produto encontrado por codigo exato');
+        return;
+      }
       successResponse(res, {
         items: result.items, total: result.total, page: result.page, limit: result.limit,
         totalPages: Math.ceil(result.total / result.limit), rankingVersion: result.rankingVersion,

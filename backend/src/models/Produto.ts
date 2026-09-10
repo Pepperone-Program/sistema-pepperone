@@ -481,7 +481,7 @@ export class ProdutoModel {
         WHERE id_empresa = ?
           AND site = 'S'
           AND habilitado = 'S'
-          AND codigo = ?
+          AND LOWER(codigo) = LOWER(?)
         LIMIT 1
       `,
       [empresaId, codigo]
@@ -502,29 +502,24 @@ export class ProdutoModel {
       WHERE id_empresa = ?
         AND site = 'S'
         AND habilitado = 'S'
-        AND codigo LIKE ?
+        AND LOWER(codigo) LIKE LOWER(?) ESCAPE '!'
     `;
-    const values: any[] = [empresaId, `%${codigo}%`];
+    const literal = codigo.trim().replace(/[!%_]/g, '!$&');
+    const values: any[] = [empresaId, `%${literal}%`];
 
     const countResult = await query(
       sql.replace(`SELECT ${SITE_PRODUTO_COLUMNS}`, 'SELECT COUNT(*) as total'),
       values
     );
-    const total = (countResult as any[])[0].total;
+    const total = Number((countResult as any[])[0].total);
 
     const offset = (page - 1) * limit;
     const items = await query(
       `${sql}
-        ORDER BY
-          CASE
-            WHEN codigo LIKE ? THEN 0
-            ELSE 1
-          END,
-          produto ASC,
-          id_produto ASC
+        ORDER BY codigo ASC, id_produto ASC
         LIMIT ? OFFSET ?
       `,
-      [...values, `${codigo}%`, limit, offset]
+      [...values, limit, offset]
     );
 
     return { items: items as Produto[], total };

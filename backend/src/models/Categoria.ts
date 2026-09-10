@@ -26,7 +26,8 @@ export class CategoriaModel {
     const searchPattern = `%${term}%`;
     const result = await query(
       `
-        SELECT id_empresa, id_categoria, categoria, descricao, icon, habilitado, url_capa
+        SELECT id_empresa, id_categoria, categoria, titulo_h1, meta_title,
+               meta_description, descricao, icon, habilitado, url_capa
         FROM categorias
         WHERE id_empresa = ?
           AND habilitado = 'S'
@@ -48,11 +49,24 @@ export class CategoriaModel {
   }
 
   static async create(empresaId: number, data: CreateCategoriaDTO): Promise<number> {
-    const columns = ['id_empresa', 'categoria', 'descricao', 'icon', 'habilitado', 'url_capa'];
-    const placeholders = ['?', '?', '?', '?', '?', '?'];
+    const columns = [
+      'id_empresa',
+      'categoria',
+      'titulo_h1',
+      'meta_title',
+      'meta_description',
+      'descricao',
+      'icon',
+      'habilitado',
+      'url_capa',
+    ];
+    const placeholders = ['?', '?', '?', '?', '?', '?', '?', '?', '?'];
     const values: any[] = [
       empresaId,
       data.categoria,
+      data.titulo_h1 || null,
+      data.meta_title || null,
+      data.meta_description || null,
       data.descricao || null,
       data.icon || null,
       data.habilitado || 'S',
@@ -76,8 +90,8 @@ export class CategoriaModel {
 
   static async findById(empresaId: number, categoriaId: number): Promise<Categoria | null> {
     const sql = `
-      SELECT id_empresa, id_categoria, categoria, descricao, icon, habilitado
-           , url_capa
+      SELECT id_empresa, id_categoria, categoria, titulo_h1, meta_title,
+             meta_description, descricao, icon, habilitado, url_capa
       FROM categorias
       WHERE id_empresa = ? AND id_categoria = ?
       LIMIT 1
@@ -88,8 +102,8 @@ export class CategoriaModel {
 
   static async findByName(empresaId: number, categoria: string): Promise<Categoria | null> {
     const sql = `
-      SELECT id_empresa, id_categoria, categoria, descricao, icon, habilitado
-           , url_capa
+      SELECT id_empresa, id_categoria, categoria, titulo_h1, meta_title,
+             meta_description, descricao, icon, habilitado, url_capa
       FROM categorias
       WHERE id_empresa = ? AND LOWER(categoria) = ?
       LIMIT 1
@@ -128,7 +142,8 @@ export class CategoriaModel {
     const total = (countResult as any[])[0].total;
 
     const sql = `
-      SELECT id_empresa, id_categoria, categoria, descricao, icon, habilitado, url_capa
+      SELECT id_empresa, id_categoria, categoria, titulo_h1, meta_title,
+             meta_description, descricao, icon, habilitado, url_capa
       FROM categorias
       ${where}
       ORDER BY categoria ASC
@@ -143,7 +158,16 @@ export class CategoriaModel {
     categoriaId: number,
     data: UpdateCategoriaDTO
   ): Promise<boolean> {
-    const allowedColumns = ['categoria', 'descricao', 'icon', 'habilitado', 'url_capa'];
+    const allowedColumns = [
+      'categoria',
+      'titulo_h1',
+      'meta_title',
+      'meta_description',
+      'descricao',
+      'icon',
+      'habilitado',
+      'url_capa',
+    ];
     const updates: string[] = [];
     const values: any[] = [];
 
