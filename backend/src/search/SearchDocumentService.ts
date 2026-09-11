@@ -65,6 +65,16 @@ export class SearchDocumentService {
 
     const productIds = products.map((product) => Number(product.id_produto));
     const productPlaceholders = productIds.map(() => '?').join(',');
+    await execute(`UPDATE product_search_documents psd
+      INNER JOIN produtos p ON p.id_empresa = psd.id_empresa AND p.id_produto = psd.id_produto
+      SET psd.updated_at = GREATEST(
+        CURRENT_TIMESTAMP,
+        DATE_ADD(
+          COALESCE(p.data_modificacao, p.data_inclusao, UTC_TIMESTAMP()),
+          INTERVAL TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), CURRENT_TIMESTAMP) SECOND
+        )
+      )
+      WHERE psd.id_empresa = ? AND psd.id_produto IN (${productPlaceholders})`, [empresaId, ...productIds]);
     await execute(`DELETE FROM product_search_attributes WHERE id_empresa = ? AND source = 'DERIVED' AND id_produto IN (${productPlaceholders})`, [empresaId, ...productIds]);
     const definitions = await execute(`SELECT id, attribute_key FROM search_attribute_definitions WHERE id_empresa = ? AND active = 1`, [empresaId]) as Array<{ id: number; attribute_key: string }>;
     const definitionIds = new Map(definitions.map((definition) => [definition.attribute_key, Number(definition.id)]));

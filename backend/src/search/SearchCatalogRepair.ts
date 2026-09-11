@@ -13,6 +13,14 @@ export type SearchCatalogCoverage = {
   ready: boolean;
 };
 
+export type SearchCatalogRepairProgress = {
+  phase: 'synchronize' | 'remove-orphans';
+  processed: number;
+  batchSize: number;
+  firstProductId?: number;
+  lastProductId?: number;
+};
+
 export class SearchCatalogRepair {
   static async inspect(empresaId: number): Promise<SearchCatalogCoverage> {
     const rows = await query(`SELECT
@@ -22,7 +30,10 @@ export class SearchCatalogRepair {
         ON psd.id_empresa = p.id_empresa AND psd.id_produto = p.id_produto
         WHERE p.id_empresa = ? AND p.site = 'S' AND p.habilitado = 'S' AND psd.is_public = 1
           AND psd.document_version = ? AND psd.source_hash <> ''
-          AND psd.updated_at >= COALESCE(p.data_modificacao, p.data_inclusao)) valid_documents`,
+          AND psd.updated_at >= DATE_ADD(
+            COALESCE(p.data_modificacao, p.data_inclusao),
+            INTERVAL TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), CURRENT_TIMESTAMP) SECOND
+          )) valid_documents`,
     [empresaId, empresaId, empresaId, SEARCH_DOCUMENT_VERSION]) as Array<{
       public_products: number;
       public_documents: number;
@@ -40,7 +51,11 @@ export class SearchCatalogRepair {
     };
   }
 
-  static async repair(empresaId: number, batchSize: number = DEFAULT_BATCH_SIZE): Promise<{
+  static async repair(
+    empresaId: number,
+    batchSize: number = DEFAULT_BATCH_SIZE,
+    onProgress?: (progress: SearchCatalogRepairProgress) => void,
+  ): Promise<{
     synchronized: number;
     removed: number;
     coverage: SearchCatalogCoverage;
@@ -58,7 +73,10 @@ export class SearchCatalogRepair {
               SELECT 1 FROM product_search_documents psd
               WHERE psd.id_empresa = p.id_empresa AND psd.id_produto = p.id_produto
                 AND psd.is_public = 1 AND psd.document_version = ? AND psd.source_hash <> ''
-                AND psd.updated_at >= COALESCE(p.data_modificacao, p.data_inclusao)
+                AND psd.updated_at >= DATE_ADD(
+                  COALESCE(p.data_modificacao, p.data_inclusao),
+                  INTERVAL TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), CURRENT_TIMESTAMP) SECOND
+                )
             ))
             OR ((p.site <> 'S' OR p.habilitado <> 'S') AND EXISTS (
               SELECT 1 FROM product_search_documents psd
@@ -71,6 +89,13 @@ export class SearchCatalogRepair {
       if (!products.length) break;
       await SearchDocumentService.syncProducts(empresaId, products);
       synchronized += products.length;
+      onProgress?.({
+        phase: 'synchronize',
+        processed: synchronized,
+        batchSize: products.length,
+        firstProductId: Number(products[0].id_produto),
+        lastProductId: Number(products[products.length - 1].id_produto),
+      });
     }
 
     while (true) {
@@ -85,6 +110,13 @@ export class SearchCatalogRepair {
         await SearchDocumentService.removeProduct(empresaId, Number(row.id_produto));
         removed += 1;
       }
+      onProgress?.({
+        phase: 'remove-orphans',
+        processed: removed,
+        batchSize: orphanRows.length,
+        firstProductId: Number(orphanRows[0].id_produto),
+        lastProductId: Number(orphanRows[orphanRows.length - 1].id_produto),
+      });
     }
 
     return { synchronized, removed, coverage: await this.inspect(empresaId) };
