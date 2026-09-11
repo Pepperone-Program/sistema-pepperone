@@ -7,6 +7,7 @@ import routes from '@routes/index';
 import { allowedCorsOrigins, corsMiddleware, securityHeaders, requestLogger } from '@middleware/common';
 import { errorHandler, notFoundHandler } from '@middleware/error';
 import { closeDatabasePool, testDatabaseConnection } from '@database/connection';
+import { SearchCoverageScheduler } from '@/search/SearchCoverageScheduler';
 
 dotenv.config();
 
@@ -61,10 +62,12 @@ const bootstrap = async (): Promise<void> => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/health`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    SearchCoverageScheduler.start();
   });
 
   const shutdown = (signal: string) => {
     console.log(`${signal} signal received: closing HTTP server`);
+    SearchCoverageScheduler.stop();
     server.close(async () => {
       console.log('HTTP server closed');
       await closeDatabasePool();

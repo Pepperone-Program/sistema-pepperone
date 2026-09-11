@@ -75,6 +75,8 @@ router.get(
 
 router.get('/search/debug', authMiddleware, SearchController.debug);
 router.get('/search/metrics', authMiddleware, SearchController.metrics);
+router.get('/search/maintenance', authMiddleware, SearchController.maintenanceStatus);
+router.post('/search/maintenance/repair', authMiddleware, SearchController.repairMaintenance);
 router.get('/search/dictionary', authMiddleware, SearchController.listDictionary);
 router.post('/search/dictionary', authMiddleware, SearchController.upsertDictionary);
 router.delete('/search/dictionary/:id', authMiddleware, SearchController.deleteDictionary);

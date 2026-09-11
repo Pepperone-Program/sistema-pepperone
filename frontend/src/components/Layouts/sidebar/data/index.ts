@@ -98,6 +98,12 @@ export const NAV_DATA: NavSection[] = [
         icon: Icons.User,
         items: [],
       },
+      {
+        title: "Busca do site",
+        url: "/busca-site",
+        icon: Icons.PieChart,
+        items: [],
+      },
     ],
   },
 ];
