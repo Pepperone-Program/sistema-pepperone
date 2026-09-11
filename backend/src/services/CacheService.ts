@@ -165,6 +165,7 @@ export class CacheService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(command),
+      signal: AbortSignal.timeout(500),
     });
 
     if (!response.ok) {

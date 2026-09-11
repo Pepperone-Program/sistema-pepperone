@@ -11,8 +11,8 @@ import { decodeSearchCursor, encodeSearchCursor } from './SearchCursorCodec';
 import { SearchAnalyticsService } from './SearchAnalyticsService';
 import { SearchObservability } from './SearchObservability';
 import { filterRelevantCandidates } from './SearchRelevanceFilter';
-import { SearchCatalogReadiness } from './SearchCatalogReadiness';
 import { normalizeSearchQuery } from './QueryNormalizer';
+import { OptionalSearchDependency } from './OptionalSearchDependency';
 
 const afterCursor = (item: RankedSearchCandidate, cursor: ReturnType<typeof decodeSearchCursor>): boolean => {
   if (!cursor) return true;
@@ -31,8 +31,7 @@ export class ProductSearchService {
     if (normalizeSearchQuery(options.query).normalized.length < SEARCH_LIMITS.minLength) {
       throw Object.assign(new Error('Informe ao menos 2 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
     }
-    await SearchCatalogReadiness.assertReady(options.empresaId);
-    const dictionary = await DictionaryService.listActive(options.empresaId);
+    const dictionary = await DictionaryService.listForSearch(options.empresaId);
     const parsed = QueryParser.parse(options.query, dictionary);
     const parserMs = performance.now() - parserStarted;
     const databaseStarted = performance.now();
@@ -72,14 +71,14 @@ export class ProductSearchService {
     const result: SearchResult = { searchId, rankingVersion: SEARCH_RANKING_VERSION,
       results: hydratedProducts, total: ordered.length, limit: options.limit, nextCursor, fallback: false };
     SearchObservability.log(searchId, options.empresaId, SEARCH_RANKING_VERSION, { databaseMs, parserMs, rankingMs, totalMs, candidateCount: candidates.length, resultCount: pageItems.length, fallback: false });
-    await SearchAnalyticsService.record({ searchId, empresaId: options.empresaId, rankingVersion: SEARCH_RANKING_VERSION,
+    void OptionalSearchDependency.run(`analytics:${options.empresaId}`, () => SearchAnalyticsService.record({ searchId, empresaId: options.empresaId, rankingVersion: SEARCH_RANKING_VERSION,
       normalizedQuery: parsed.normalized, filters: options.filters, resultCount: pageItems.length, candidateCount: candidates.length,
-      databaseMs, parserMs, rankingMs, totalMs, cacheStatus: 'miss', fallback: false });
+      databaseMs, parserMs, rankingMs, totalMs, cacheStatus: 'miss', fallback: false }), undefined);
     return result;
   }
 
   static async debug(options: PublicSearchOptions): Promise<object> {
-    const dictionary = await DictionaryService.listActive(options.empresaId);
+    const dictionary = await DictionaryService.listForSearch(options.empresaId);
     const parsed = QueryParser.parse(options.query, dictionary);
     const candidates = await CandidateRetriever.retrieve(options.empresaId, parsed, options.filters);
     const ranked = ProductRankingEngine.rank(parsed, candidates);

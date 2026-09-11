@@ -3,16 +3,19 @@ import { getConnection } from '@database/connection';
 import type { Produto } from '@/types/produto';
 import { SEARCH_DOCUMENT_VERSION } from '@config/search';
 import { normalizeComparable } from './QueryNormalizer';
-import { QueryParser } from './QueryParser';
-import { SearchCatalogReadiness } from './SearchCatalogReadiness';
-
-const canonicalizeType = (value: string): string | null => {
-  const first = normalizeComparable(value).split(' ')[0];
-  if (!first) return null;
-  return first.length > 3 && first.endsWith('s') ? first.slice(0, -1) : first;
-};
+import { canonicalizeType, parseProductSearchData } from './CatalogSearchCandidate';
+import { OptionalSearchDependency } from './OptionalSearchDependency';
 
 export class SearchDocumentService {
+  static async trySyncProduct(empresaId: number, product: Produto): Promise<void> {
+    await OptionalSearchDependency.run(`write-index:${empresaId}:${product.id_produto}`, () => this.syncProduct(empresaId, product), undefined,
+      400, `write-index:${empresaId}`);
+  }
+
+  static async tryRemoveProduct(empresaId: number, productId: number): Promise<void> {
+    await OptionalSearchDependency.run(`write-index:${empresaId}:${productId}:remove`, () => this.removeProduct(empresaId, productId), undefined,
+      400, `write-index:${empresaId}`);
+  }
   static async syncProduct(empresaId: number, product: Produto): Promise<void> {
     await this.syncProducts(empresaId, [product]);
   }
@@ -25,7 +28,6 @@ export class SearchDocumentService {
       await connection.execute('DELETE FROM product_contains_types WHERE id_empresa = ? AND id_produto = ?', [empresaId, productId]);
       await connection.execute('DELETE FROM product_search_documents WHERE id_empresa = ? AND id_produto = ?', [empresaId, productId]);
       await connection.commit();
-      SearchCatalogReadiness.clearCache();
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -44,7 +46,7 @@ export class SearchDocumentService {
     const placeholders = typeIds.map(() => '?').join(',');
     const typeRows = await execute(`SELECT id_tipo_produto, tipo_produto FROM tipos_produtos WHERE id_empresa = ? AND id_tipo_produto IN (${placeholders})`, [empresaId, ...typeIds]) as Array<{ id_tipo_produto: number; tipo_produto: string }>;
     const types = new Map(typeRows.map((row) => [Number(row.id_tipo_produto), canonicalizeType(row.tipo_produto)]));
-    const parsedByProduct = new Map(products.map((product) => [Number(product.id_produto), QueryParser.parse(`${product.produto || ''} ${product.descricao || ''}`)]));
+    const parsedByProduct = new Map(products.map((product) => [Number(product.id_produto), parseProductSearchData(product)]));
     const rows = products.map((product) => {
       const canonicalType = types.get(Number(product.id_tipo_produto)) || null;
       const name = normalizeComparable(product.produto || '');
@@ -117,7 +119,6 @@ export class SearchDocumentService {
         confidence=IF(source='MANUAL',confidence,VALUES(confidence)), source=IF(source='MANUAL',source,VALUES(source))`, containsRows.flat());
     }
       await connection.commit();
-      SearchCatalogReadiness.clearCache();
     } catch (error) {
       await connection.rollback();
       throw error;

@@ -3,11 +3,7 @@ import type { PublicSearchOptions, SearchResult } from '@/types/search';
 import { ProductSearchService } from './ProductSearchService';
 import { ProdutoService } from '@services/ProdutoService';
 import { ProdutoModel } from '@models/Produto';
-import { CacheService } from '@services/CacheService';
-import { SEARCH_CACHE_TTL_SECONDS, SEARCH_LIMITS, SEARCH_RANKING_VERSION } from '@config/search';
-import { DictionaryService } from './DictionaryService';
-import { SearchCatalogReadiness } from './SearchCatalogReadiness';
-import { createHash } from 'crypto';
+import { SEARCH_LIMITS, SEARCH_RANKING_VERSION } from '@config/search';
 
 export interface SiteSearchPage {
   items: Produto[];
@@ -56,15 +52,6 @@ export class PublicSiteSearchService {
       };
     }
     options = { ...options, page: Math.min(options.page, SEARCH_LIMITS.maxPage) };
-    await SearchCatalogReadiness.assertReady(options.empresaId);
-    const dictionaryVersion = await DictionaryService.version(options.empresaId);
-    const fingerprint = createHash('sha256').update(JSON.stringify({
-      term, page: options.page, limit: options.limit, cursor: options.cursor,
-      sort: options.sort, filters: options.filters,
-    })).digest('hex');
-    const key = CacheService.buildKey('search-v2', [options.empresaId, SEARCH_RANKING_VERSION,
-      'literal-code-v1', dictionaryVersion, fingerprint].join(':'));
-    return CacheService.getOrSet(key,
-      async () => advancedToPage(await ProductSearchService.search(options), options), SEARCH_CACHE_TTL_SECONDS);
+    return advancedToPage(await ProductSearchService.search(options), options);
   }
 }

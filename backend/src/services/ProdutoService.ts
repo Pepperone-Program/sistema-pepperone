@@ -66,7 +66,7 @@ export class ProdutoService {
     }
 
     if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
-      await SearchDocumentService.syncProduct(empresaId, produto as Produto);
+      await SearchDocumentService.trySyncProduct(empresaId, produto as Produto);
     }
     return produto as Produto;
   }
@@ -238,7 +238,7 @@ export class ProdutoService {
     }
 
     if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
-      await SearchDocumentService.syncProduct(empresaId, updated as Produto);
+      await SearchDocumentService.trySyncProduct(empresaId, updated as Produto);
     }
     return updated as Produto;
   }
@@ -259,7 +259,7 @@ export class ProdutoService {
       throwError('DELETE_FAILED', 'Falha ao deletar produto', 500);
     }
     if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
-      await SearchDocumentService.removeProduct(empresaId, produtoId);
+      await SearchDocumentService.tryRemoveProduct(empresaId, produtoId);
     }
   }
 

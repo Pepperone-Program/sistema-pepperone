@@ -1120,7 +1120,7 @@ async function persistIfUnchanged(
 
   if (process.env.SEARCH_DOCUMENT_SYNC_ENABLED !== 'false') {
     const updated = await ProdutoModel.findById(empresaId, original.id_produto);
-    if (updated) await SearchDocumentService.syncProduct(empresaId, updated);
+    if (updated) await SearchDocumentService.trySyncProduct(empresaId, updated);
   }
 }
 

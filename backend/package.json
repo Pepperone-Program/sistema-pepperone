@@ -19,8 +19,6 @@
     "seo:categories:generate": "tsx src/scripts/verifyCategorySeoContent.ts --write",
     "seo:categories:verify": "tsx src/scripts/verifyCategorySeoContent.ts",
     "search:preflight": "tsx src/scripts/searchPreflight.ts",
-    "search:repair-coverage": "tsx src/scripts/repairSearchCoverage.ts",
-    "search:rebuild": "tsx src/scripts/rebuildSearchData.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc",
@@ -40,7 +38,6 @@
     "jsonwebtoken": "^9.0.0",
     "multer": "^2.1.1",
     "mysql2": "^3.6.5",
-    "node-cron": "^4.2.1",
     "pdfkit": "^0.18.0",
     "sharp": "^0.34.5",
     "uuid": "^9.0.1"

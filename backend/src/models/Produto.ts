@@ -1,3 +1,4 @@
+import { adminProductSearch } from './adminProductSearch';
 import { getConnection, query } from '@database/connection';
 import { PRODUTO_COLUMNS, SITE_PRODUTO_COLUMNS } from './selectColumns';
 import type {
@@ -343,19 +344,9 @@ export class ProdutoModel {
     let where = 'FROM produtos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
 
-    if (search) {
-      const normalizedSearch = search.trim();
-      const searchPattern = `%${normalizedSearch}%`;
-      const numericId = /^\d+$/.test(normalizedSearch) ? Number(normalizedSearch) : null;
-
-      if (numericId !== null && Number.isSafeInteger(numericId)) {
-        where += ' AND (id_produto = ? OR codigo LIKE ? OR produto LIKE ?)';
-        values.push(numericId, searchPattern, searchPattern);
-      } else {
-        where += ' AND (codigo LIKE ? OR produto LIKE ?)';
-        values.push(searchPattern, searchPattern);
-      }
-    }
+    const searchFilter = adminProductSearch(search);
+    where += searchFilter.sql;
+    values.push(...searchFilter.values);
 
     if (habilitado === 'S' || habilitado === 'N') {
       where += ' AND habilitado = ?';

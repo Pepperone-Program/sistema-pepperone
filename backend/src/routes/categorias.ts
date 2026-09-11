@@ -6,6 +6,8 @@ import { categoriaSchema, vincularProdutoSchema } from '@utils/validation';
 import multer from 'multer';
 
 const router = Router();
+router.get('/:id/produtos/disponiveis', authMiddleware, CategoriaController.availableProducts);
+router.post('/:id/produtos/lote', authMiddleware, CategoriaController.assignProducts);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024, files: 1 },

@@ -10,7 +10,7 @@ import {
 } from "@/lib/api";
 import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { EntityProductsModal } from "./promotion-products-modal";
+import { CategoryProductsModal } from "./category-products-modal";
 import { StatusBadge } from "./status-badge";
 
 type Category = Record<string, unknown> & {
@@ -406,12 +406,9 @@ export function CategoriesPage() {
 
       {modalCategory !== undefined && <CategoryModal category={modalCategory} onClose={() => setModalCategory(undefined)} onSaved={loadData} />}
       {productsCategory && (
-        <EntityProductsModal
-          endpoint="/api/v1/categorias"
-          entity={productsCategory}
-          entityIdField="id_categoria"
-          entityNameField="categoria"
-          eyebrow="Produtos da categoria"
+        <CategoryProductsModal
+          categoryId={Number(productsCategory.id_categoria)}
+          categoryName={String(productsCategory.categoria || "Categoria")}
           onClose={() => setProductsCategory(null)}
         />
       )}

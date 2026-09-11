@@ -5,7 +5,6 @@ vi.mock('../../src/models/Produto', () => ({ ProdutoModel: {
   searchByCodigoLikeForSite: vi.fn(), findImagesByProductIds: vi.fn(),
 } }));
 vi.mock('../../src/search/ProductSearchService', () => ({ ProductSearchService: { search: vi.fn() } }));
-vi.mock('../../src/search/SearchCatalogReadiness', () => ({ SearchCatalogReadiness: { assertReady: vi.fn() } }));
 vi.mock('../../src/search/DictionaryService', () => ({ DictionaryService: { version: vi.fn().mockResolvedValue(1) } }));
 vi.mock('../../src/services/CacheService', () => ({ CacheService: {
   buildKey: (_namespace: string, key: string) => key,
@@ -16,7 +15,6 @@ import { PublicSiteSearchService } from '../../src/search/PublicSiteSearchServic
 import { ProdutoService } from '../../src/services/ProdutoService';
 import { ProdutoModel } from '../../src/models/Produto';
 import { ProductSearchService } from '../../src/search/ProductSearchService';
-import { SearchCatalogReadiness } from '../../src/search/SearchCatalogReadiness';
 import type { PublicSearchOptions } from '../../src/types/search';
 
 const options = (query: string): PublicSearchOptions => ({ empresaId: 1, query, page: 1, limit: 10, sort: 'relevance', filters: {} });
@@ -38,7 +36,6 @@ describe('literal code search precedence', () => {
     expect(result.exactProduct).toBeUndefined();
     expect(ProdutoService.findExactProductCodeForSite).not.toHaveBeenCalled();
     expect(ProdutoModel.searchByCodigoLikeForSite).not.toHaveBeenCalled();
-    expect(SearchCatalogReadiness.assertReady).not.toHaveBeenCalled();
     expect(ProductSearchService.search).not.toHaveBeenCalled();
   });
 
@@ -55,7 +52,6 @@ describe('literal code search precedence', () => {
     expect(result.page).toBe(2);
     expect(result.exactProduct).toBeUndefined();
     expect(result.nextCursor).toBeNull();
-    expect(SearchCatalogReadiness.assertReady).not.toHaveBeenCalled();
     expect(ProductSearchService.search).not.toHaveBeenCalled();
     expect(ProdutoModel.searchByCodigoLikeForSite).toHaveBeenCalledWith(1, query, 2, 10);
   });
@@ -84,6 +80,5 @@ describe('literal code search precedence', () => {
     vi.mocked(ProductSearchService.search).mockResolvedValue({ results: [], total: 0, limit: 10, rankingVersion: 'v4' } as any);
     await PublicSiteSearchService.search(options(query));
     expect(ProductSearchService.search).toHaveBeenCalledWith(options(query));
-    expect(SearchCatalogReadiness.assertReady).toHaveBeenCalledWith(1);
   });
 });

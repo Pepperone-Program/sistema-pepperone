@@ -4,8 +4,6 @@ import { query } from '@database/connection';
 import { CacheService } from '@services/CacheService';
 import { ProductSearchService } from '@/search/ProductSearchService';
 import { SearchObservability } from '@/search/SearchObservability';
-import { SearchCoverageScheduler } from '@/search/SearchCoverageScheduler';
-import { SearchMaintenanceService } from '@/search/SearchMaintenanceService';
 import { normalizeSearchQuery } from '@/search/QueryNormalizer';
 import type { DictionaryEntryType, DictionaryRelation, ConstraintStrength, SearchSort } from '@/types/search';
 import { successResponse, errorResponse } from '@utils/response';
@@ -15,30 +13,6 @@ const allowedRelations: DictionaryRelation[] = ['EXACT_SYNONYM','RELATED_TERM','
 const allowedStrengths: ConstraintStrength[] = ['HARD','STRONG','SOFT'];
 
 export class SearchController {
-  static async maintenanceStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const status = await SearchMaintenanceService.status(req.user!.id_empresa);
-      const cron = SearchCoverageScheduler.config();
-      successResponse(res, {
-        ...status,
-        cron: { enabled: cron.enabled && cron.empresaId === req.user!.id_empresa, expression: cron.expression },
-      }, 'Status da manutencao da busca');
-    } catch (error) {
-      const err = error as Error & { code?: string; statusCode?: number };
-      errorResponse(res, err.code || 'SEARCH_MAINTENANCE_ERROR', err.message, err.statusCode || 500);
-    }
-  }
-
-  static async repairMaintenance(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const result = await SearchMaintenanceService.run(req.user!.id_empresa, 'manual');
-      successResponse(res, result, result.skipped ? 'A busca ja estava saudavel' : 'Busca reparada com sucesso');
-    } catch (error) {
-      const err = error as Error & { code?: string; statusCode?: number };
-      errorResponse(res, err.code || 'SEARCH_MAINTENANCE_ERROR', err.message, err.statusCode || 500);
-    }
-  }
-
   static metrics(_req: AuthenticatedRequest, res: Response): void {
     successResponse(res, SearchObservability.snapshot(), 'Metricas locais da busca');
   }
