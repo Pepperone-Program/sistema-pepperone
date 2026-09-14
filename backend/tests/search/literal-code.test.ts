@@ -27,16 +27,27 @@ beforeEach(() => {
 });
 
 describe('literal code search precedence', () => {
-  it.each(['pep', 'PEP', ' PeP '])('lists the entire public catalog first for %s', async (query) => {
+  it.each(['pep', 'PEP', ' PeP '])('lists the entire public catalog when %s is not an exact code', async (query) => {
     const items = [{ id_produto: 99, codigo: 'CM001' }] as any;
     vi.mocked(ProdutoService.listProdutosSite).mockResolvedValue({ items, total: 3500, page: 102, limit: 10 });
     const result = await PublicSiteSearchService.search({ ...options(query), empresaId: 7, page: 102 });
     expect(ProdutoService.listProdutosSite).toHaveBeenCalledWith(7, 102, 10);
     expect(result).toMatchObject({ items, total: 3500, page: 102, limit: 10, nextCursor: null });
     expect(result.exactProduct).toBeUndefined();
-    expect(ProdutoService.findExactProductCodeForSite).not.toHaveBeenCalled();
+    expect(ProdutoService.findExactProductCodeForSite).toHaveBeenCalledWith(7, query.trim());
     expect(ProdutoModel.searchByCodigoLikeForSite).not.toHaveBeenCalled();
     expect(ProductSearchService.search).not.toHaveBeenCalled();
+  });
+
+  it('prioritizes an exact PEP code over the full catalog', async () => {
+    const exact = { id_produto: 1, codigo: 'PEP', match_exato_codigo: true } as any;
+    vi.mocked(ProdutoService.findExactProductCodeForSite).mockResolvedValue(exact);
+
+    const result = await PublicSiteSearchService.search(options('pep'));
+
+    expect(result).toMatchObject({ items: [exact], total: 1, page: 1, exactProduct: exact });
+    expect(ProdutoService.listProdutosSite).not.toHaveBeenCalled();
+    expect(ProdutoModel.searchByCodigoLikeForSite).not.toHaveBeenCalled();
   });
 
   it('rejects cursors for the full catalog', async () => {
@@ -63,12 +74,14 @@ describe('literal code search precedence', () => {
     expect(ProductSearchService.search).not.toHaveBeenCalled();
   });
 
-  it('preserves exact-code response only from exact lookup', async () => {
-    const exact = { id_produto: 1, codigo: 'PEPKET1001', match_exato_codigo: true } as any;
+  it('returns PEPKB1033 individually through a trimmed, case-insensitive exact lookup', async () => {
+    const exact = { id_produto: 1, codigo: 'PEPKB1033', match_exato_codigo: true } as any;
     vi.mocked(ProdutoService.findExactProductCodeForSite).mockResolvedValue(exact);
-    const result = await PublicSiteSearchService.search(options(' PEPKET1001 '));
+    const result = await PublicSiteSearchService.search(options(' pepkb1033 '));
     expect(result.exactProduct).toEqual(exact);
-    expect(ProdutoService.findExactProductCodeForSite).toHaveBeenCalledWith(1, 'PEPKET1001');
+    expect(result.items).toMatchObject([exact]);
+    expect(ProdutoService.findExactProductCodeForSite).toHaveBeenCalledWith(1, 'pepkb1033');
+    expect(ProdutoModel.searchByCodigoLikeForSite).not.toHaveBeenCalled();
   });
 
   it('rejects cursors for literal code searches', async () => {

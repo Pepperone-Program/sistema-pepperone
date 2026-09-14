@@ -27,6 +27,19 @@ export class PublicSiteSearchService {
     if (term.length < SEARCH_LIMITS.minLength || term.length > SEARCH_LIMITS.maxLength) {
       throw Object.assign(new Error('Informe entre 2 e 200 caracteres'), { code: 'INVALID_SEARCH', statusCode: 400 });
     }
+    const exact = await ProdutoService.findExactProductCodeForSite(options.empresaId, term);
+    if (exact) {
+      if (options.cursor) {
+        throw Object.assign(new Error('Busca por codigo utiliza page e limit, sem cursor'), { code: 'INVALID_CURSOR', statusCode: 400 });
+      }
+      const images = await ProdutoModel.findImagesByProductIds([Number(exact.id_produto)]);
+      return {
+        items: [{ ...exact, imagens: images.get(Number(exact.id_produto)) || [] }],
+        total: 1, page: 1, limit: options.limit,
+        rankingVersion: `${SEARCH_RANKING_VERSION}-literal-code-v1`, nextCursor: null,
+        exactProduct: exact,
+      };
+    }
     if (term.toLowerCase() === 'pep') {
       if (options.cursor) {
         throw Object.assign(new Error('Catalogo completo utiliza page e limit, sem cursor'), { code: 'INVALID_CURSOR', statusCode: 400 });
@@ -34,21 +47,19 @@ export class PublicSiteSearchService {
       const catalog = await ProdutoService.listProdutosSite(options.empresaId, options.page, options.limit);
       return { ...catalog, rankingVersion: `${SEARCH_RANKING_VERSION}-full-catalog-pep-v1`, nextCursor: null };
     }
-    const exact = await ProdutoService.findExactProductCodeForSite(options.empresaId, term);
-    const codes = exact ? { items: [exact], total: 1 } : await ProdutoModel.searchByCodigoLikeForSite(
+    const codes = await ProdutoModel.searchByCodigoLikeForSite(
       options.empresaId, term, options.page, options.limit,
     );
     const codeLike = !/\s/.test(term) && /[a-z]/i.test(term) && /[0-9]/.test(term);
-    if (exact || codes.total > 0 || codeLike) {
+    if (codes.total > 0 || codeLike) {
       if (options.cursor) {
         throw Object.assign(new Error('Busca por codigo utiliza page e limit, sem cursor'), { code: 'INVALID_CURSOR', statusCode: 400 });
       }
       const images = await ProdutoModel.findImagesByProductIds(codes.items.map((item) => Number(item.id_produto)));
       return {
         items: codes.items.map((item) => ({ ...item, imagens: images.get(Number(item.id_produto)) || [] })),
-        total: codes.total, page: exact ? 1 : options.page, limit: options.limit,
+        total: codes.total, page: options.page, limit: options.limit,
         rankingVersion: `${SEARCH_RANKING_VERSION}-literal-code-v1`, nextCursor: null,
-        ...(exact ? { exactProduct: exact } : {}),
       };
     }
     options = { ...options, page: Math.min(options.page, SEARCH_LIMITS.maxPage) };
