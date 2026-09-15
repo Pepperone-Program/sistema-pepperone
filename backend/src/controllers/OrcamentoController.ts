@@ -1,13 +1,20 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '@middleware/auth';
 import { OrcamentoService } from '@services/OrcamentoService';
+import { CacheService } from '@services/CacheService';
 import { successResponse, paginatedResponse, errorResponse } from '@utils/response';
+
+const TOP_CATEGORIAS_CACHE_TTL_SECONDS = 24 * 60 * 60;
 
 export class OrcamentoController {
   static async topCategoriasOrcadas(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const empresaId = req.user?.id_empresa || 1;
-      const result = await OrcamentoService.getTopCategoriasOrcadas(empresaId);
+      const result = await CacheService.getOrSet(
+        CacheService.buildKey('orcamentos', `estatisticas:top-categorias:${empresaId}`),
+        () => OrcamentoService.getTopCategoriasOrcadas(empresaId),
+        TOP_CATEGORIAS_CACHE_TTL_SECONDS,
+      );
       successResponse(res, result, 'Categorias mais orcadas listadas com sucesso');
     } catch (error) {
       const err = error as any;

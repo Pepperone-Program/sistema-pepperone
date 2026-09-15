@@ -421,13 +421,15 @@ export class ProdutoModel {
     page: number = 1,
     limit: number = 100
   ): Promise<{ items: Produto[]; total: number }> {
-    const searchPattern = `%${term}%`;
+    const normalizedTerm = term.trim();
+    const literal = normalizedTerm.replace(/[!%_]/g, '!$&');
+    const searchPattern = `%${literal}%`;
     const fromWhere = `
       FROM produtos
       WHERE id_empresa = ?
         AND site = 'S'
         AND habilitado = 'S'
-        AND produto LIKE ?
+        AND produto LIKE ? ESCAPE '!'
     `;
     const filterValues = [empresaId, searchPattern];
 
@@ -435,7 +437,7 @@ export class ProdutoModel {
       `SELECT COUNT(*) as total ${fromWhere}`,
       filterValues
     );
-    const total = (countResult as any[])[0].total;
+    const total = Number((countResult as any[])[0].total);
 
     const offset = (page - 1) * limit;
     const sql = `
@@ -444,7 +446,7 @@ export class ProdutoModel {
       ORDER BY
         CASE
           WHEN produto = ? THEN 0
-          WHEN produto LIKE ? THEN 1
+          WHEN produto LIKE ? ESCAPE '!' THEN 1
           ELSE 2
         END,
         data_modificacao DESC
@@ -453,8 +455,8 @@ export class ProdutoModel {
 
     const items = await query(sql, [
       ...filterValues,
-      term,
-      `${term}%`,
+      normalizedTerm,
+      `${literal}%`,
       limit,
       offset,
     ]);

@@ -79,6 +79,8 @@ const pool = createDatabasePool();
 
 const mapDbError = (error: unknown): Error & { code: string; statusCode: number } => {
   const dbError = error as { code?: DbErrorCode; message?: string };
+  const queueLimitReached = dbError.code === 'POOL_ENQUEUELIMIT'
+    || /queue limit reached/i.test(dbError.message || '');
 
   const mapped = new Error('Falha na conexão com o banco de dados') as Error & {
     code: string;
@@ -121,6 +123,13 @@ const mapDbError = (error: unknown): Error & { code: string; statusCode: number 
       mapped.message = 'Servidor MySQL indisponível ou inacessível.';
       break;
     default:
+      if (queueLimitReached) {
+        mapped.code = 'DB_TOO_MANY_REQUESTS';
+        mapped.statusCode = 503;
+        mapped.message =
+          'Banco de dados atingiu o limite de conexoes simultaneas. Tente novamente em instantes.';
+        break;
+      }
       mapped.code = 'DB_QUERY_ERROR';
       mapped.statusCode = 500;
       mapped.message = dbError.message || 'Erro interno ao consultar banco de dados.';
