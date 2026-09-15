@@ -76,15 +76,24 @@ export class CandidateRetriever {
 
   static async retrieveCatalog(empresaId: number, parsed: ParsedSearchQuery, filters: SearchFilters): Promise<SearchCandidate[]> {
     const terms = [...new Set([...(parsed.productType ? [parsed.productType.value] : []), ...parsed.positiveTerms, ...parsed.synonyms])];
+    const originalNameTerm = parsed.original.trim().replace(/\s+/g, ' ');
+    const needsOriginalNameTerm = Boolean(originalNameTerm)
+      && !terms.includes(originalNameTerm.toLocaleLowerCase('pt-BR'));
     const conditions = ["p.id_empresa = ?", "p.site = 'S'", "p.habilitado = 'S'"];
     const values: unknown[] = [empresaId];
     // Broad entrance; the existing relevance gate checks every term and constraint afterwards.
-    if (terms.length) {
-      conditions.push(`(${terms.map(() => "(p.produto LIKE ? ESCAPE '!' OR tp.tipo_produto LIKE ? ESCAPE '!')").join(' OR ')})`);
+    if (terms.length || needsOriginalNameTerm) {
+      const textConditions: string[] = [];
       for (const term of terms) {
+        textConditions.push("(p.produto LIKE ? ESCAPE '!' OR tp.tipo_produto LIKE ? ESCAPE '!')");
         const pattern = `%${term.replace(/[!%_]/g, '!$&')}%`;
         values.push(pattern, pattern);
       }
+      if (needsOriginalNameTerm) {
+        textConditions.push("p.produto LIKE ? ESCAPE '!'");
+        values.push(`%${originalNameTerm.replace(/[!%_]/g, '!$&')}%`);
+      }
+      conditions.push(`(${textConditions.join(' OR ')})`);
     }
     if (filters.categoryId) {
       conditions.push('EXISTS (SELECT 1 FROM aux_categorias_produtos acp WHERE acp.id_empresa = p.id_empresa AND acp.id_produto = p.id_produto AND acp.id_categoria = ?)');

@@ -9,7 +9,7 @@ export const SEARCH_LIMITS = {
   candidateLimit: 3000,
 } as const;
 
-export const SEARCH_RANKING_VERSION = `${process.env.SEARCH_RANKING_VERSION || 'v4'}-catalog-v1`;
+export const SEARCH_RANKING_VERSION = `${process.env.SEARCH_RANKING_VERSION || 'v4'}-catalog-v2`;
 export const SEARCH_DOCUMENT_VERSION = 3;
 export const SEARCH_CACHE_TTL_SECONDS = Number(process.env.SEARCH_CACHE_TTL_SECONDS || 300);
 

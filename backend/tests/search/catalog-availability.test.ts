@@ -20,16 +20,17 @@ const product = (id: number, name: string, type = 'Caderno') => ({
 let products: ReturnType<typeof product>[];
 let indexFailure: boolean;
 let dictionaryFailure: boolean;
+let dictionaryEntries: any[];
 
 beforeEach(() => {
   vi.clearAllMocks();
   empresaId++;
   products = [product(1, 'Caderno com pauta'), product(2, 'Caderno sem pauta'), product(3, 'Caderno A5')];
-  indexFailure = false; dictionaryFailure = false;
+  indexFailure = false; dictionaryFailure = false; dictionaryEntries = [];
   vi.mocked(query).mockImplementation(async (sql: string, values?: any[]) => {
     if (sql.includes('FROM search_dictionary')) {
       if (dictionaryFailure) throw new Error('dictionary offline');
-      return [];
+      return dictionaryEntries;
     }
     if (sql.includes('WITH candidate_ids')) {
       if (indexFailure) throw new Error('index offline');
@@ -134,6 +135,31 @@ describe('catalog search availability', () => {
     const call = vi.mocked(query).mock.calls[0];
     expect(call[0]).toContain('acp.id_empresa = p.id_empresa');
     expect(call[1]).toContain(9);
+  });
+
+  it('also retrieves the original accented phrase for product-name supplementation', async () => {
+    await CandidateRetriever.retrieveCatalog(empresaId, QueryParser.parse('taça'), {});
+    const call = vi.mocked(query).mock.calls[0];
+    expect(call[0]).toContain("p.produto LIKE ? ESCAPE '!'");
+    expect(call[1]).toContain('%taca%');
+    expect(call[1]).toContain('%taça%');
+  });
+
+  it('returns ranked taça products first and then other product names containing taça', async () => {
+    dictionaryEntries = [{
+      id: 1, term: 'taça', normalized_term: 'taca', type: 'PRODUCT_TYPE', canonical_value: 'taca',
+      priority: 1, relation_type: null, strength: 'STRONG',
+    }];
+    products = [
+      product(1, 'Taça de Vidro Personalizada', 'Taça'),
+      product(2, 'Kit com Taça e Abridor Personalizado', 'Kit'),
+      product(3, 'Kit para Vinho Personalizado', 'Kit'),
+    ];
+
+    const result = await search('taça');
+
+    expect(result.total).toBe(2);
+    expect(result.results.map((item) => item.id_produto)).toEqual([1, 2]);
   });
 
   it('serves concurrent searches while a stalled index has only one in-flight request', async () => {

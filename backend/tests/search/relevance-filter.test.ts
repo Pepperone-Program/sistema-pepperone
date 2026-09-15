@@ -52,4 +52,21 @@ describe('public relevance final gate', () => {
     ]);
     expect(filterRelevantCandidates(parsed, ranked).map((item) => item.product.id_produto)).toEqual([1]);
   });
+
+  it('keeps ranked product types first and appends other products whose names contain the complete query', () => {
+    const parsed = QueryParser.parse('taça', [{
+      id: 1, term: 'taça', normalizedTerm: 'taca', type: 'PRODUCT_TYPE', canonicalValue: 'taca',
+      priority: 1, relationType: null, strength: 'STRONG',
+    }]);
+    const ranked = ProductRankingEngine.rank(parsed, [
+      candidate(1, 'Taça de Vidro Personalizada', 'taca'),
+      candidate(2, 'Kit com Taça e Abridor Personalizado', 'kit'),
+      candidate(3, 'Kit para Vinho Personalizado', 'kit'),
+    ]);
+
+    const result = filterRelevantCandidates(parsed, ranked);
+
+    expect(result.map((item) => item.product.id_produto)).toEqual([1, 2]);
+    expect(result[1].group).toBe(13);
+  });
 });
