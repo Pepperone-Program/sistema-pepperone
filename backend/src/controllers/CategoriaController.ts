@@ -8,6 +8,7 @@ import { errorResponse, paginatedResponse, successResponse } from '@utils/respon
 const getEmpresaId = (req: AuthenticatedRequest): number => req.user?.id_empresa || 1;
 const getPage = (req: AuthenticatedRequest): number => parseInt((req.query.page as string) || '1', 10);
 const getLimit = (req: AuthenticatedRequest): number => parseInt((req.query.limit as string) || '100', 10);
+const CATEGORY_CATALOG_CACHE_TTL_SECONDS = 30 * 60;
 
 export class CategoriaController {
   static async availableProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -184,7 +185,8 @@ export class CategoriaController {
               quantidade_minima_min: req.query.quantidade_minima_min as string | undefined,
               quantidade_minima_max: req.query.quantidade_minima_max as string | undefined,
             }
-          )
+          ),
+        CATEGORY_CATALOG_CACHE_TTL_SECONDS
       );
 
       successResponse(res, result, 'Catalogo da categoria listado com sucesso');

@@ -14,6 +14,54 @@ import type {
 const normalizeLimit = (limit: number): number => Math.min(Math.max(limit, 1), 500);
 const normalizePage = (page: number): number => Math.max(page, 1);
 
+type CatalogMembership = {
+  fromSql: string;
+  where: string[];
+  values: any[];
+};
+
+const buildCatalogMembership = (
+  empresaId: number,
+  categoriaId: number,
+  subcategorias: number[] = []
+): CatalogMembership => {
+  if (subcategorias.length > 0) {
+    return {
+      fromSql: 'FROM produtos p',
+      where: [
+        'p.id_empresa = ?',
+        `EXISTS (
+          SELECT 1
+          FROM aux_subcategorias_produtos asp_catalog
+          INNER JOIN subcategorias s_catalog
+            ON s_catalog.id_empresa = asp_catalog.id_empresa
+           AND s_catalog.id_subcategoria = asp_catalog.id_subcategoria
+          WHERE asp_catalog.id_empresa = p.id_empresa
+            AND asp_catalog.id_produto = p.id_produto
+            AND s_catalog.id_categoria = ?
+            AND s_catalog.habilitado = 'S'
+            AND asp_catalog.id_subcategoria IN (${subcategorias.map(() => '?').join(',')})
+        )`,
+      ],
+      values: [empresaId, categoriaId, ...subcategorias],
+    };
+  }
+
+  return {
+    fromSql: `
+      FROM aux_categorias_produtos acp
+      INNER JOIN produtos p
+        ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
+    `,
+    where: [
+      'acp.id_empresa = ?',
+      'p.id_empresa = ?',
+      'acp.id_categoria = ?',
+    ],
+    values: [empresaId, empresaId, categoriaId],
+  };
+};
+
 export class CategoriaModel {
   static async findSearchCandidates(
     empresaId: number,
@@ -315,14 +363,17 @@ export class CategoriaModel {
   ) {
     const safePage = normalizePage(filters.page);
     const safeLimit = normalizeLimit(filters.limit);
+    const membership = buildCatalogMembership(
+      empresaId,
+      categoriaId,
+      filters.subcategorias
+    );
     const where: string[] = [
-      'p.id_empresa = ?',
-      'acp.id_empresa = ?',
-      'acp.id_categoria = ?',
+      ...membership.where,
       "p.habilitado = 'S'",
       "p.site = 'S'",
     ];
-    const values: any[] = [empresaId, empresaId, categoriaId];
+    const values: any[] = [...membership.values];
 
     if (filters.quantidadeMinimaMin !== undefined) {
       where.push('CAST(COALESCE(NULLIF(p.quantidade_minima, \'\'), 0) AS UNSIGNED) >= ?');
@@ -332,19 +383,6 @@ export class CategoriaModel {
     if (filters.quantidadeMinimaMax !== undefined) {
       where.push('CAST(COALESCE(NULLIF(p.quantidade_minima, \'\'), 0) AS UNSIGNED) <= ?');
       values.push(filters.quantidadeMinimaMax);
-    }
-
-    if (filters.subcategorias?.length) {
-      where.push(`
-        EXISTS (
-          SELECT 1
-          FROM aux_subcategorias_produtos asp_filter
-          WHERE asp_filter.id_empresa = p.id_empresa
-            AND asp_filter.id_produto = p.id_produto
-            AND asp_filter.id_subcategoria IN (${filters.subcategorias.map(() => '?').join(',')})
-        )
-      `);
-      values.push(...filters.subcategorias);
     }
 
     if (filters.publicosAlvos?.length) {
@@ -375,9 +413,7 @@ export class CategoriaModel {
     const countRows = (await query(
       `
         SELECT COUNT(DISTINCT p.id_produto) as total
-        FROM aux_categorias_produtos acp
-        INNER JOIN produtos p
-          ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
+        ${membership.fromSql}
         WHERE ${whereSql}
       `,
       values
@@ -388,9 +424,7 @@ export class CategoriaModel {
         SELECT
           ${SITE_PRODUTO_COLUMNS_P},
           NULL as imagem_url
-        FROM aux_categorias_produtos acp
-        INNER JOIN produtos p
-          ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
+        ${membership.fromSql}
         WHERE ${whereSql}
         ORDER BY p.produto ASC, p.id_produto ASC
         LIMIT ? OFFSET ?
@@ -516,17 +550,23 @@ export class CategoriaModel {
     empresaId: number,
     categoriaId: number,
     filters: {
+      subcategorias?: number[];
       publicosAlvos?: number[];
       datasPromocionais?: number[];
       quantidadeMinimaMin?: number;
       quantidadeMinimaMax?: number;
     } = {}
   ) {
-    const baseValues = [empresaId, empresaId, categoriaId];
+    const membership = buildCatalogMembership(
+      empresaId,
+      categoriaId,
+      filters.subcategorias
+    );
     const subcategoriaWhere: string[] = [
-      'acp.id_empresa = ?',
+      'asp.id_empresa = ?',
       'p.id_empresa = ?',
-      'acp.id_categoria = ?',
+      's_link.id_categoria = ?',
+      "s_link.habilitado = 'S'",
       "p.habilitado = 'S'",
       "p.site = 'S'",
     ];
@@ -573,11 +613,12 @@ export class CategoriaModel {
           FROM subcategorias s
           LEFT JOIN (
             SELECT asp.id_subcategoria, COUNT(DISTINCT p.id_produto) as total
-            FROM aux_categorias_produtos acp
+            FROM aux_subcategorias_produtos asp
+            INNER JOIN subcategorias s_link
+              ON s_link.id_empresa = asp.id_empresa
+             AND s_link.id_subcategoria = asp.id_subcategoria
             INNER JOIN produtos p
-              ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
-            INNER JOIN aux_subcategorias_produtos asp
-              ON asp.id_empresa = p.id_empresa AND asp.id_produto = p.id_produto
+              ON p.id_empresa = asp.id_empresa AND p.id_produto = asp.id_produto
             WHERE ${subcategoriaWhere.join(' AND ')}
             GROUP BY asp.id_subcategoria
           ) totais
@@ -591,47 +632,40 @@ export class CategoriaModel {
       query(
         `
           SELECT pa.id_publico_alvo, pa.publico_alvo, COUNT(DISTINCT p.id_produto) as total
-          FROM aux_categorias_produtos acp
-          INNER JOIN produtos p
-            ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto AND p.habilitado = 'S' AND p.site = 'S'
+          ${membership.fromSql}
           INNER JOIN aux_publicos_alvos_produtos app
             ON app.id_produto = p.id_produto
           INNER JOIN publicos_alvos pa
             ON pa.id_publico_alvo = app.id_publico_alvo
-          WHERE acp.id_empresa = ? AND p.id_empresa = ? AND acp.id_categoria = ? AND pa.habilitado = 'S'
+          WHERE ${[...membership.where, "p.habilitado = 'S'", "p.site = 'S'", "pa.habilitado = 'S'"].join(' AND ')}
           GROUP BY pa.id_publico_alvo, pa.publico_alvo, pa.ordem
           ORDER BY pa.ordem ASC, pa.publico_alvo ASC
         `,
-        baseValues
+        membership.values
       ),
       query(
         `
           SELECT dp.id_data_promocional, dp.data_promocional, dp.data, COUNT(DISTINCT p.id_produto) as total
-          FROM aux_categorias_produtos acp
-          INNER JOIN produtos p
-            ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto AND p.habilitado = 'S' AND p.site = 'S'
+          ${membership.fromSql}
           INNER JOIN aux_datas_promocionais_produtos adp
             ON adp.id_produto = p.id_produto
           INNER JOIN datas_promocionais dp
             ON dp.id_data_promocional = adp.id_data_promocional
-          WHERE acp.id_empresa = ? AND p.id_empresa = ? AND acp.id_categoria = ? AND dp.habilitado = 'S'
+          WHERE ${[...membership.where, "p.habilitado = 'S'", "p.site = 'S'", "dp.habilitado = 'S'"].join(' AND ')}
           GROUP BY dp.id_data_promocional, dp.data_promocional, dp.data, dp.ordem
           ORDER BY dp.ordem ASC, dp.data_promocional ASC
         `,
-        baseValues
+        membership.values
       ),
       query(
         `
           SELECT
             MIN(CAST(COALESCE(NULLIF(p.quantidade_minima, ''), 0) AS UNSIGNED)) as min,
             MAX(CAST(COALESCE(NULLIF(p.quantidade_minima, ''), 0) AS UNSIGNED)) as max
-          FROM aux_categorias_produtos acp
-          INNER JOIN produtos p
-            ON p.id_empresa = acp.id_empresa AND p.id_produto = acp.id_produto
-          WHERE acp.id_empresa = ? AND p.id_empresa = ? AND acp.id_categoria = ?
-            AND p.habilitado = 'S' AND p.site = 'S'
+          ${membership.fromSql}
+          WHERE ${[...membership.where, "p.habilitado = 'S'", "p.site = 'S'"].join(' AND ')}
         `,
-        baseValues
+        membership.values
       ),
     ]);
 
