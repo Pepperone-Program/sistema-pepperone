@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { CategoryProductsService } from '@services/CategoryProductsService';
+import { SubcategoryProductsService } from '@services/SubcategoryProductsService';
 import { AuthenticatedRequest } from '@middleware/auth';
 import { CategoriaService, SubcategoriaService } from '@services/CategoriaService';
 import { CacheService } from '@services/CacheService';
@@ -249,6 +250,34 @@ export class CategoriaController {
 }
 
 export class SubcategoriaController {
+  static async availableProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const parsedPage = Number(req.query.page || 1);
+      const result = await SubcategoryProductsService.available(
+        req.user!.id_empresa,
+        Number(req.params.id),
+        String(req.query.search || '').trim(),
+        Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+        req.query.ids_only === '1'
+      );
+      successResponse(res, result);
+    } catch (error) {
+      const err = error as any;
+      errorResponse(res, err.code || 'ERROR', err.message, err.statusCode || 500);
+    }
+  }
+
+  static async assignProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const result = await SubcategoryProductsService.assign(req.user!.id_empresa, Number(req.params.id), req.body?.produto_ids);
+      await CacheService.invalidateNamespaces(['categorias', 'produtos', 'subcategorias', 'publicos-alvos', 'datas-promocionais', 'search', 'search-v2']);
+      successResponse(res, result, 'Produtos cadastrados na subcategoria');
+    } catch (error) {
+      const err = error as any;
+      errorResponse(res, err.code || 'ERROR', err.message, err.statusCode || 500);
+    }
+  }
+
   static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const subcategoria = await SubcategoriaService.createSubcategoria(

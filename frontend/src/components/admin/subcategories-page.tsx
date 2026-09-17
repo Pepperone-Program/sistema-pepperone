@@ -9,7 +9,7 @@ import {
 } from "@/lib/api";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { EntityProductsModal } from "./promotion-products-modal";
+import { SubcategoryProductsModal } from "./subcategory-products-modal";
 import { StatusBadge } from "./status-badge";
 
 type Category = Record<string, unknown> & {
@@ -431,12 +431,9 @@ export function SubcategoriesPage() {
         />
       )}
       {productsSubcategory && (
-        <EntityProductsModal
-          endpoint="/api/v1/subcategorias"
-          entity={productsSubcategory}
-          entityIdField="id_subcategoria"
-          entityNameField="subcategoria"
-          eyebrow="Produtos da subcategoria"
+        <SubcategoryProductsModal
+          subcategoryId={Number(productsSubcategory.id_subcategoria)}
+          subcategoryName={String(productsSubcategory.subcategoria || "Subcategoria")}
           onClose={() => setProductsSubcategory(null)}
         />
       )}

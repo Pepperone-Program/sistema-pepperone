@@ -125,6 +125,10 @@ export const vincularProdutoSchema = Joi.object({
   id_produto: Joi.number().integer().positive().required(),
 });
 
+export const vincularProdutosLoteSchema = Joi.object({
+  produto_ids: Joi.array().items(Joi.number().integer().positive()).min(1).max(50000).required(),
+});
+
 export const grupoPermissaoSchema = Joi.object({
   permissao: Joi.string().trim().min(1).max(100).required(),
 });

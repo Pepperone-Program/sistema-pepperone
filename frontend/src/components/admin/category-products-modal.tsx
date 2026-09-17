@@ -11,12 +11,16 @@ export function CategoryProductsModal({
   categoryId,
   categoryName,
   onClose,
+  productsEndpoint,
+  entityLabel = "categoria",
 }: {
   categoryId: number;
   categoryName: string;
   onClose: () => void;
+  productsEndpoint?: string;
+  entityLabel?: "categoria" | "subcategoria";
 }) {
-  const endpoint = `/api/v1/categorias/${categoryId}/produtos`;
+  const endpoint = productsEndpoint || `/api/v1/categorias/${categoryId}/produtos`;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -126,7 +130,7 @@ export function CategoryProductsModal({
       );
       setSelected(new Set());
       setMessage(
-        `${result.processed} produtos cadastrados na categoria. ${result.changed} alterados.`,
+        `${result.processed} produtos cadastrados na ${entityLabel}. ${result.changed} alterados.`,
       );
       setRevision((value) => value + 1);
     } catch (err) {
@@ -187,7 +191,7 @@ export function CategoryProductsModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                Produtos da categoria
+                Produtos da {entityLabel}
               </p>
               <h2
                 id="category-products-title"
@@ -334,9 +338,10 @@ export function CategoryProductsModal({
             </div>
           </div>
           <p className="text-sm text-dark-4">
-            Os selecionados terão suas categorias substituídas por esta.
-            Subcategorias de outras categorias serão removidas. Selecionar não
-            altera os produtos.
+            {entityLabel === "categoria"
+              ? "Os selecionados terão suas categorias substituídas por esta. Subcategorias de outras categorias serão removidas."
+              : "Os selecionados serão adicionados a esta subcategoria, preservando categorias e outras subcategorias vinculadas."}{" "}
+            Selecionar não altera os produtos.
           </p>
           <button
             type="button"
@@ -345,8 +350,8 @@ export function CategoryProductsModal({
             className="w-full rounded-md bg-primary px-4 py-3 text-sm font-bold text-white disabled:opacity-40 sm:w-auto"
           >
             {saving
-              ? "Cadastrando..."
-              : `Cadastrar selecionados na categoria (${selected.size})`}
+              ? entityLabel === "categoria" ? "Cadastrando..." : "Adicionando..."
+              : `${entityLabel === "categoria" ? "Cadastrar" : "Adicionar"} selecionados na ${entityLabel} (${selected.size})`}
           </button>
         </footer>
       </div>
