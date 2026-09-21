@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/services/ProdutoService', () => ({ ProdutoService: { findExactProductCodeForSite: vi.fn(), listProdutosSite: vi.fn() } }));
 vi.mock('../../src/models/Produto', () => ({ ProdutoModel: {
-  searchByCodigoLikeForSite: vi.fn(), searchForSite: vi.fn(), findImagesByProductIds: vi.fn(),
+  searchByCodigoLikeForSite: vi.fn(), searchBySupplierCodeForSite: vi.fn(), searchForSite: vi.fn(), findImagesByProductIds: vi.fn(),
 } }));
 vi.mock('../../src/search/ProductSearchService', () => ({ ProductSearchService: { search: vi.fn() } }));
 vi.mock('../../src/search/DictionaryService', () => ({ DictionaryService: { version: vi.fn().mockResolvedValue(1) } }));
@@ -24,6 +24,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(ProdutoService.findExactProductCodeForSite).mockResolvedValue(null);
   vi.mocked(ProdutoModel.searchByCodigoLikeForSite).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(ProdutoModel.searchBySupplierCodeForSite).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(ProdutoModel.searchForSite).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(ProdutoModel.findImagesByProductIds).mockResolvedValue(new Map());
   vi.mocked(ProductSearchService.search).mockResolvedValue({
@@ -136,10 +137,26 @@ describe('literal code search precedence', () => {
     const result = await PublicSiteSearchService.search(options('garrafa de metal'));
 
     expect(ProdutoModel.searchByCodigoLikeForSite).toHaveBeenCalledWith(1, 'garrafa de metal', 1, 10);
+    expect(ProdutoModel.searchBySupplierCodeForSite).toHaveBeenCalledWith(1, 'garrafa de metal', 1, 10);
     expect(ProdutoModel.searchForSite).toHaveBeenCalledWith(1, 'garrafa de metal', 1, 10);
     expect(result).toMatchObject({
       items: [{ ...item, imagens: [{ id_imagem: 1 }] }], total: 1, page: 1, limit: 10,
       rankingVersion: expect.stringContaining('name-like-fallback-v1'), nextCursor: null,
+    });
+  });
+
+  it('returns an exact supplier code match before falling back to the product name', async () => {
+    const item = { id_produto: 21, codigo: 'PEP123', cod_forn: 'SQ023' } as any;
+    vi.mocked(ProdutoModel.searchBySupplierCodeForSite).mockResolvedValue({ items: [item], total: 1 });
+
+    const result = await PublicSiteSearchService.search(options('SQ023'));
+
+    expect(ProdutoModel.searchByCodigoLikeForSite).toHaveBeenCalledWith(1, 'SQ023', 1, 10);
+    expect(ProdutoModel.searchBySupplierCodeForSite).toHaveBeenCalledWith(1, 'SQ023', 1, 10);
+    expect(ProdutoModel.searchForSite).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      items: [item], total: 1, page: 1, limit: 10,
+      rankingVersion: expect.stringContaining('supplier-code-exact-v1'), nextCursor: null,
     });
   });
 

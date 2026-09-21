@@ -14,6 +14,7 @@
     "catalog:pdf": "tsx src/scripts/generateProductCatalogPdf.ts",
     "catalog:maggenta:pdf": "tsx src/scripts/generateMaggentaProductCatalogPdf.ts",
     "ai:descriptions": "tsx src/scripts/generateProductDescriptions.ts",
+    "products:descriptions:update": "tsx src/scripts/updateProductDescriptionsFromJson.ts",
     "db:migrate": "tsx src/scripts/runMigrations.ts up",
     "db:rollback": "tsx src/scripts/runMigrations.ts down",
     "seo:categories:generate": "tsx src/scripts/verifyCategorySeoContent.ts --write",

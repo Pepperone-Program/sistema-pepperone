@@ -31,6 +31,24 @@ it('uses full equality for exact codes without inserting a prefix', async () => 
   expect(vi.mocked(query).mock.calls[0][1]).toEqual([1, 'pepket1001']);
 });
 
+it('uses full equality for supplier codes without a partial-match fallback', async () => {
+  vi.mocked(query).mockResolvedValueOnce([{ total: '1' }]).mockResolvedValueOnce([]);
+
+  const result = await ProdutoModel.searchBySupplierCodeForSite(7, ' SQ023 ', 2, 10);
+
+  expect(result.total).toBe(1);
+  const calls = vi.mocked(query).mock.calls;
+  for (const [sql, values] of calls) {
+    expect(sql).toContain('id_empresa = ?');
+    expect(sql).toContain("site = 'S'");
+    expect(sql).toContain("habilitado = 'S'");
+    expect(sql).toContain('LOWER(cod_forn) = LOWER(?)');
+    expect(sql).not.toContain('cod_forn) LIKE');
+    expect(values?.slice(0, 2)).toEqual([7, 'SQ023']);
+  }
+  expect(calls[1][1]).toEqual([7, 'SQ023', 10, 10]);
+});
+
 it('treats the complete product-name phrase literally and scopes it to public tenant products', async () => {
   vi.mocked(query).mockResolvedValueOnce([{ total: '1' }]).mockResolvedValueOnce([]);
 

@@ -518,6 +518,41 @@ export class ProdutoModel {
     return { items: items as Produto[], total };
   }
 
+  static async searchBySupplierCodeForSite(
+    empresaId: number,
+    supplierCode: string,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<{ items: Produto[]; total: number }> {
+    const normalizedSupplierCode = supplierCode.trim();
+    const sql = `
+      SELECT ${SITE_PRODUTO_COLUMNS}
+      FROM produtos
+      WHERE id_empresa = ?
+        AND site = 'S'
+        AND habilitado = 'S'
+        AND LOWER(cod_forn) = LOWER(?)
+    `;
+    const values: any[] = [empresaId, normalizedSupplierCode];
+
+    const countResult = await query(
+      sql.replace(`SELECT ${SITE_PRODUTO_COLUMNS}`, 'SELECT COUNT(*) as total'),
+      values
+    );
+    const total = Number((countResult as any[])[0].total);
+
+    const offset = (page - 1) * limit;
+    const items = await query(
+      `${sql}
+        ORDER BY codigo ASC, id_produto ASC
+        LIMIT ? OFFSET ?
+      `,
+      [...values, limit, offset]
+    );
+
+    return { items: items as Produto[], total };
+  }
+
   static async update(
     empresaId: number,
     produtoId: number,

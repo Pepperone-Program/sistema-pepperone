@@ -69,6 +69,17 @@ export class PublicSiteSearchService {
         rankingVersion: `${SEARCH_RANKING_VERSION}-literal-code-v1`, nextCursor: null,
       };
     }
+    const supplierCodes = await ProdutoModel.searchBySupplierCodeForSite(
+      options.empresaId, term, options.page, options.limit,
+    );
+    if (supplierCodes.total > 0) {
+      const images = await ProdutoModel.findImagesByProductIds(supplierCodes.items.map((item) => Number(item.id_produto)));
+      return {
+        items: supplierCodes.items.map((item) => ({ ...item, imagens: images.get(Number(item.id_produto)) || [] })),
+        total: supplierCodes.total, page: options.page, limit: options.limit,
+        rankingVersion: `${SEARCH_RANKING_VERSION}-supplier-code-exact-v1`, nextCursor: null,
+      };
+    }
     const names = await ProdutoModel.searchForSite(options.empresaId, term, options.page, options.limit);
     const images = await ProdutoModel.findImagesByProductIds(names.items.map((item) => Number(item.id_produto)));
     return {
