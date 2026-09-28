@@ -36,7 +36,7 @@ export const orcamentoSchema = Joi.object({
   id_cliente: Joi.string().allow(null),
   data_orcamento: Joi.date().required(),
   fantasia: Joi.string().max(255).allow(null, ''),
-  endereco: Joi.string().max(255).required(),
+  endereco: Joi.string().max(255).allow('').default(''),
   endereco_n: Joi.string().max(20).allow(null, ''),
   endereco_compl: Joi.string().max(255).allow(null, ''),
   bairro: Joi.string().max(100).allow(null, ''),
