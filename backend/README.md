@@ -147,3 +147,21 @@ Todos os inputs são validados com Joi. Erros de validação retornam:
 O ranking avançado, suas migrations, preflight, rebuild, rollout e testes estão documentados em
 [`docs/product-search.md`](docs/product-search.md). Ele fica desativado por padrão e não altera a
 busca administrativa.
+
+# Envio idempotente de orcamentos
+
+`POST /api/v1/orcamentos` aceita o header `Idempotency-Key` ou o campo
+`idempotency_key`. Reenvios com a mesma identidade retornam o orcamento
+original sem criar outro cabecalho. O endpoint de itens tambem deduplica
+reenvios equivalentes e sempre usa o `id_orcamento` informado na URL.
+
+Antes do deploy, prepare e valide a infraestrutura no banco configurado:
+
+```bash
+npm run db:ensure-orcamento-idempotency
+```
+
+Esse comando cria, quando necessario, a tabela `orcamentos_idempotencia` e
+falha com codigo diferente de zero se o usuario do banco nao tiver acesso.
+Tambem e possivel aplicar a migration `007_orcamento_idempotency` pelo fluxo
+normal de migrations do projeto.

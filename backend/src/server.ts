@@ -7,6 +7,7 @@ import routes from '@routes/index';
 import { allowedCorsOrigins, corsMiddleware, securityHeaders, requestLogger } from '@middleware/common';
 import { errorHandler, notFoundHandler } from '@middleware/error';
 import { closeDatabasePool, testDatabaseConnection } from '@database/connection';
+import { OrcamentoModel } from '@models/Orcamento';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ const PORT = process.env.PORT || 3001;
 const bootstrap = async (): Promise<void> => {
   try {
     await testDatabaseConnection();
+    await OrcamentoModel.ensureIdempotencyInfrastructure();
   } catch (error) {
     console.warn(
       'Database startup check failed; server will keep running and retry on requests:',

@@ -20,6 +20,7 @@
     "seo:categories:generate": "tsx src/scripts/verifyCategorySeoContent.ts --write",
     "seo:categories:verify": "tsx src/scripts/verifyCategorySeoContent.ts",
     "search:preflight": "tsx src/scripts/searchPreflight.ts",
+    "db:ensure-orcamento-idempotency": "tsx src/scripts/ensureOrcamentoIdempotency.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc",
