@@ -163,5 +163,7 @@ npm run db:ensure-orcamento-idempotency
 
 Esse comando cria, quando necessario, a tabela `orcamentos_idempotencia` e
 falha com codigo diferente de zero se o usuario do banco nao tiver acesso.
+Em desenvolvimento, antes do build, use
+`npm run db:ensure-orcamento-idempotency:dev`.
 Tambem e possivel aplicar a migration `007_orcamento_idempotency` pelo fluxo
 normal de migrations do projeto.
