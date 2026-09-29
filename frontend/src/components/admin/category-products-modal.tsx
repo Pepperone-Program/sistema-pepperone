@@ -140,7 +140,7 @@ export function CategoryProductsModal({
     setError("");
     setMessage("");
     try {
-      const result = await apiRequest<{ processed: number; changed: number; added?: number; removed?: number }>(
+      const result = await apiRequest<{ processed: number; changed: number; added?: number; removed?: number; skipped?: number }>(
         `${endpoint}/lote`,
         {
           method: "POST",
@@ -152,7 +152,8 @@ export function CategoryProductsModal({
       );
       setSelected(new Set());
       if (entityLabel === "subcategoria") {
-        setMessage(`${result.added || 0} produtos adicionados e ${result.removed || 0} removidos da subcategoria.`);
+        const skippedMessage = result.skipped ? ` ${result.skipped} não foram adicionados porque não existem mais nesta empresa.` : "";
+        setMessage(`${result.added || 0} produtos adicionados e ${result.removed || 0} removidos da subcategoria.${skippedMessage}`);
         initialLinked.current = new Set();
         initializedSubcategory.current = false;
         setData(null);

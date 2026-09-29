@@ -72,20 +72,17 @@ export class SubcategoryProductsService {
       );
       if (!(subcategories as unknown[]).length) throwError('SUBCATEGORIA_NOT_FOUND', 'Subcategoria nao encontrada', 404);
 
-      const chunks: number[][] = [];
-      for (let start = 0; start < ids.length; start += 500) {
-        const chunk = ids.slice(start, start + 500);
-        chunks.push(chunk);
+      const validAddIds: number[] = [];
+      for (let start = 0; start < addIds.length; start += 500) {
+        const chunk = addIds.slice(start, start + 500);
         const [rows] = await connection.execute(`SELECT id_produto FROM produtos WHERE id_empresa = ?
           AND id_produto IN (${chunk.map(() => '?').join(',')}) ORDER BY id_produto FOR UPDATE`, [empresaId, ...chunk]);
-        if ((rows as unknown[]).length !== chunk.length) {
-          throwError('INVALID_SELECTION', 'Um ou mais produtos nao existem nesta empresa. Atualize a selecao.', 422);
-        }
+        validAddIds.push(...(rows as Array<{ id_produto: number }>).map((row) => Number(row.id_produto)));
       }
 
       let added = 0;
-      for (let start = 0; start < addIds.length; start += 500) {
-        const chunk = addIds.slice(start, start + 500);
+      for (let start = 0; start < validAddIds.length; start += 500) {
+        const chunk = validAddIds.slice(start, start + 500);
         const placeholders = chunk.map(() => '?').join(',');
         const [links] = await connection.execute(`SELECT id_produto FROM aux_subcategorias_produtos
           WHERE id_empresa = ? AND id_subcategoria = ? AND id_produto IN (${placeholders}) FOR UPDATE`, [empresaId, subcategoriaId, ...chunk]);
@@ -107,7 +104,7 @@ export class SubcategoryProductsService {
         removed += Number((result as { affectedRows?: number }).affectedRows || 0);
       }
       await connection.commit();
-      return { processed: ids.length, changed: added + removed, added, removed };
+      return { processed: ids.length, changed: added + removed, added, removed, skipped: addIds.length - validAddIds.length };
     } catch (error) {
       if (transactionStarted) await connection.rollback();
       throw error;
