@@ -4,8 +4,9 @@ vi.mock('../src/models/Categoria', () => ({ CategoriaModel: { findById: vi.fn() 
 vi.mock('../src/models/Produto', () => ({ ProdutoModel: { findAll: vi.fn() } }));
 import { getConnection, query } from '../src/database/connection';
 import { CategoriaModel } from '../src/models/Categoria';
+import { ProdutoModel } from '../src/models/Produto';
 import { CategoryProductsService } from '../src/services/CategoryProductsService';
-import { adminProductSearch } from '../src/models/adminProductSearch';
+import { adminProductExclusion, adminProductSearch } from '../src/models/adminProductSearch';
 
 const connection = { beginTransaction: vi.fn(), execute: vi.fn(), commit: vi.fn(), rollback: vi.fn(), release: vi.fn() };
 beforeEach(() => {
@@ -87,10 +88,28 @@ describe('transactional category assignment', () => {
 
   it('select-all snapshots the entire matching set with the same search criteria', async () => {
     vi.mocked(query).mockResolvedValue(Array.from({ length: 120 }, (_, i) => ({ id_produto: i + 1 })));
-    const result = await CategoryProductsService.available(7, 8, 'caderno', 1, true);
+    const result = await CategoryProductsService.available(7, 8, 'caderno', 'caneta, ecologica', 1, true);
     expect(result.produto_ids).toHaveLength(120);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductSearch('caderno').sql), [7, '%caderno%', '%caderno%', 50001]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductSearch('caderno').sql), [7, '%caderno%', '%caderno%', '%caneta%', '%ecologica%', 50001]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductExclusion('caneta, ecologica').sql), expect.any(Array));
     expect(adminProductSearch('12').values).toEqual([12, '%12%', '%12%']);
     expect(adminProductSearch('100%_').values).toEqual(['%100!%!_%', '%100!%!_%']);
+    expect(adminProductExclusion(' caneta, , CANETA, 100%_! ').values).toEqual(['%caneta%', '%100!%!_!!%']);
+    expect(adminProductExclusion('caneta').sql).not.toContain('codigo');
+  });
+
+  it('validates exclusion limits before querying products', async () => {
+    await expect(CategoryProductsService.available(7, 8, '', 'x'.repeat(501), 1, true))
+      .rejects.toMatchObject({ code: 'INVALID_EXCLUSION', statusCode: 400 });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('uses the exclusion filter in the paginated listing', async () => {
+    vi.mocked(ProdutoModel.findAll).mockResolvedValue({ items: [], total: 0 });
+    vi.mocked(query).mockResolvedValue([]);
+    await CategoryProductsService.available(7, 8, 'bloco', 'caneta', 2, false);
+    expect(ProdutoModel.findAll).toHaveBeenCalledWith(
+      7, 2, 30, 'bloco', undefined, undefined, undefined, undefined, undefined, 'DESC', 'caneta'
+    );
   });
 });

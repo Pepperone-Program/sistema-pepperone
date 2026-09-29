@@ -16,7 +16,8 @@ export class CategoriaController {
     try {
       const parsedPage = Number(req.query.page || 1);
       const result = await CategoryProductsService.available(req.user!.id_empresa, Number(req.params.id),
-        String(req.query.search || '').trim(), Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1, req.query.ids_only === '1');
+        String(req.query.search || '').trim(), String(req.query.exclude || '').trim(),
+        Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1, req.query.ids_only === '1');
       successResponse(res, result);
     } catch (error) {
       const err = error as any;
@@ -257,6 +258,7 @@ export class SubcategoriaController {
         req.user!.id_empresa,
         Number(req.params.id),
         String(req.query.search || '').trim(),
+        String(req.query.exclude || '').trim(),
         Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
         req.query.ids_only === '1'
       );

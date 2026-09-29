@@ -1,27 +1,28 @@
 import { getConnection, query } from '@database/connection';
 import { CategoriaModel } from '@models/Categoria';
 import { ProdutoModel } from '@models/Produto';
-import { adminProductSearch } from '@models/adminProductSearch';
+import { adminProductExclusion, adminProductSearch } from '@models/adminProductSearch';
 import { throwError } from '@utils/helpers';
 
 export const CATEGORY_SELECTION_LIMIT = 50_000;
 
 export class CategoryProductsService {
-  static async available(empresaId: number, categoriaId: number, search: string, page: number, idsOnly: boolean) {
+  static async available(empresaId: number, categoriaId: number, search: string, exclude: string, page: number, idsOnly: boolean) {
     if (!Number.isSafeInteger(categoriaId) || categoriaId <= 0 || !await CategoriaModel.findById(empresaId, categoriaId)) {
       throwError('CATEGORIA_NOT_FOUND', 'Categoria nao encontrada', 404);
     }
     if (search.length > 200) throwError('INVALID_SEARCH', 'Informe ate 200 caracteres', 400);
+    const exclusion = adminProductExclusion(exclude);
     if (idsOnly) {
       const filter = adminProductSearch(search);
-      const rows = await query(`SELECT id_produto FROM produtos WHERE id_empresa = ?${filter.sql}
-        ORDER BY id_produto LIMIT ?`, [empresaId, ...filter.values, CATEGORY_SELECTION_LIMIT + 1]) as Array<{ id_produto: number }>;
+      const rows = await query(`SELECT id_produto FROM produtos WHERE id_empresa = ?${filter.sql}${exclusion.sql}
+        ORDER BY id_produto LIMIT ?`, [empresaId, ...filter.values, ...exclusion.values, CATEGORY_SELECTION_LIMIT + 1]) as Array<{ id_produto: number }>;
       if (rows.length > CATEGORY_SELECTION_LIMIT) throwError('SELECTION_TOO_LARGE', 'Refine o filtro para selecionar ate 50000 produtos', 422);
       return { produto_ids: rows.map((row) => Number(row.id_produto)) };
     }
     const limit = 30;
     const [products, links] = await Promise.all([
-      ProdutoModel.findAll(empresaId, page, limit, search),
+      ProdutoModel.findAll(empresaId, page, limit, search, undefined, undefined, undefined, undefined, undefined, 'DESC', exclude),
       query('SELECT id_produto FROM aux_categorias_produtos WHERE id_empresa = ? AND id_categoria = ?', [empresaId, categoriaId]) as Promise<Array<{ id_produto: number }>>,
     ]);
     return { ...products, page, limit, totalPages: Math.ceil(products.total / limit), linked_ids: links.map((row) => Number(row.id_produto)) };

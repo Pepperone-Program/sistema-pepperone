@@ -1,4 +1,4 @@
-import { adminProductSearch } from './adminProductSearch';
+import { adminProductExclusion, adminProductSearch } from './adminProductSearch';
 import { getConnection, query } from '@database/connection';
 import { PRODUTO_COLUMNS, SITE_PRODUTO_COLUMNS } from './selectColumns';
 import type {
@@ -339,7 +339,8 @@ export class ProdutoModel {
     tipoProduto?: string,
     categoria?: string,
     subcategoria?: string,
-    orderDirection: 'ASC' | 'DESC' = 'DESC'
+    orderDirection: 'ASC' | 'DESC' = 'DESC',
+    exclude?: string
   ): Promise<{ items: Produto[]; total: number }> {
     let where = 'FROM produtos WHERE id_empresa = ?';
     const values: any[] = [empresaId];
@@ -347,6 +348,10 @@ export class ProdutoModel {
     const searchFilter = adminProductSearch(search);
     where += searchFilter.sql;
     values.push(...searchFilter.values);
+
+    const exclusionFilter = adminProductExclusion(exclude);
+    where += exclusionFilter.sql;
+    values.push(...exclusionFilter.values);
 
     if (habilitado === 'S' || habilitado === 'N') {
       where += ' AND habilitado = ?';

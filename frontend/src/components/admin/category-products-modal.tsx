@@ -23,6 +23,8 @@ export function CategoryProductsModal({
   const endpoint = productsEndpoint || `/api/v1/categorias/${categoryId}/produtos`;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
+  const [exclude, setExclude] = useState("");
+  const [excludeFilter, setExcludeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Page | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -55,17 +57,18 @@ export function CategoryProductsModal({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setFilter(search.trim());
+      setExcludeFilter(exclude.trim());
       setPage(1);
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, exclude]);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
     apiRequest<Page>(`${endpoint}/disponiveis`, {
-      query: { search: filter, page },
+      query: { search: filter, exclude: excludeFilter, page },
       signal: controller.signal,
     })
       .then((response) => {
@@ -83,7 +86,7 @@ export function CategoryProductsModal({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [endpoint, filter, page, revision]);
+  }, [endpoint, filter, excludeFilter, page, revision]);
 
   async function selectAll() {
     if (selectingRef.current || savingRef.current) return;
@@ -97,7 +100,7 @@ export function CategoryProductsModal({
       const result = await apiRequest<{ produto_ids: number[] }>(
         `${endpoint}/disponiveis`,
         {
-          query: { search: filter, ids_only: 1 },
+          query: { search: filter, exclude: excludeFilter, ids_only: 1 },
           signal: controller.signal,
         },
       );
@@ -145,7 +148,7 @@ export function CategoryProductsModal({
 
   const busy = saving || selecting;
   const linked = new Set(data?.linked_ids || []);
-  const waitingFilter = search.trim() !== filter;
+  const waitingFilter = search.trim() !== filter || exclude.trim() !== excludeFilter;
   const buttonClass =
     "rounded-md border border-stroke px-3 py-2 text-sm font-semibold disabled:opacity-40 dark:border-dark-3";
 
@@ -220,6 +223,17 @@ export function CategoryProductsModal({
             disabled={busy}
             onChange={(event) => {
               setSearch(event.target.value);
+              setMessage("");
+            }}
+          />
+          <input
+            aria-label="Excluir produtos por palavras no nome"
+            placeholder="Excluir palavras do nome, separadas por vírgula (ex.: caneta, ecológica)"
+            className="mt-3 w-full rounded-md border border-stroke bg-gray-2 px-4 py-3 text-sm outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+            value={exclude}
+            disabled={busy}
+            onChange={(event) => {
+              setExclude(event.target.value);
               setMessage("");
             }}
           />

@@ -7,7 +7,7 @@ vi.mock('../src/models/Produto', () => ({ ProdutoModel: { findAll: vi.fn() } }))
 import { getConnection, query } from '../src/database/connection';
 import { SubcategoriaModel } from '../src/models/Categoria';
 import { SubcategoryProductsService } from '../src/services/SubcategoryProductsService';
-import { adminProductSearch } from '../src/models/adminProductSearch';
+import { adminProductExclusion, adminProductSearch } from '../src/models/adminProductSearch';
 
 const connection = {
   beginTransaction: vi.fn(), execute: vi.fn(), commit: vi.fn(), rollback: vi.fn(), release: vi.fn(),
@@ -71,9 +71,17 @@ describe('transactional subcategory assignment', () => {
 
   it('snapshots all matching products with the shared name search and escaped wildcards', async () => {
     vi.mocked(query).mockResolvedValue(Array.from({ length: 120 }, (_, index) => ({ id_produto: index + 1 })) as any);
-    const result = await SubcategoryProductsService.available(7, 9, 'caderno', 1, true);
+    const result = await SubcategoryProductsService.available(7, 9, 'caderno', 'caneta, ecologica', 1, true);
     expect(result.produto_ids).toHaveLength(120);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductSearch('caderno').sql), [7, '%caderno%', '%caderno%', 50001]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductSearch('caderno').sql), [7, '%caderno%', '%caderno%', '%caneta%', '%ecologica%', 50001]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductExclusion('caneta, ecologica').sql), expect.any(Array));
     expect(adminProductSearch('100%_').values).toEqual(['%100!%!_%', '%100!%!_%']);
+  });
+
+  it('rejects too many exclusion terms before querying products', async () => {
+    const exclude = Array.from({ length: 21 }, (_, index) => `termo${index}`).join(',');
+    await expect(SubcategoryProductsService.available(7, 9, '', exclude, 1, true))
+      .rejects.toMatchObject({ code: 'INVALID_EXCLUSION', statusCode: 400 });
+    expect(query).not.toHaveBeenCalled();
   });
 });
