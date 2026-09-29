@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { SubcategoriaController } from '@controllers/CategoriaController';
 import { authMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
-import { subcategoriaSchema, vincularProdutoSchema, vincularProdutosLoteSchema } from '@utils/validation';
+import { editarProdutosSubcategoriaLoteSchema, subcategoriaSchema, vincularProdutoSchema } from '@utils/validation';
 
 const router = Router();
 const updateSubcategoriaSchema = subcategoriaSchema.fork(
@@ -36,7 +36,7 @@ router.get(
 router.post(
   '/:id/produtos/lote',
   authMiddleware,
-  validationMiddleware(vincularProdutosLoteSchema),
+  validationMiddleware(editarProdutosSubcategoriaLoteSchema),
   SubcategoriaController.assignProducts
 );
 

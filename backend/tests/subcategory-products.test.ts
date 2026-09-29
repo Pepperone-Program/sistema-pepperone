@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('transactional subcategory assignment', () => {
   it('adds only missing links and preserves existing category and subcategory links', async () => {
-    expect(await SubcategoryProductsService.assign(7, 9, [3, 2, 1, 1])).toEqual({ processed: 3, changed: 2 });
+    expect(await SubcategoryProductsService.assign(7, 9, [3, 2, 1, 1])).toEqual({ processed: 3, changed: 2, added: 2, removed: 0 });
     const insert = connection.execute.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO aux_subcategorias_produtos'));
     expect(insert?.[1]).toEqual([7, 9, 1, 7, 9, 2]);
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith('DELETE'))).toBe(false);
@@ -37,7 +37,7 @@ describe('transactional subcategory assignment', () => {
   });
 
   it('is idempotent when every selected product is already linked', async () => {
-    expect(await SubcategoryProductsService.assign(7, 9, [3, 3])).toEqual({ processed: 1, changed: 0 });
+    expect(await SubcategoryProductsService.assign(7, 9, [3, 3])).toEqual({ processed: 1, changed: 0, added: 0, removed: 0 });
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO aux_subcategorias_produtos'))).toBe(false);
   });
 
@@ -61,6 +61,29 @@ describe('transactional subcategory assignment', () => {
     await expect(SubcategoryProductsService.assign(7, 9, [1])).rejects.toThrow('write failed');
     expect(connection.rollback).toHaveBeenCalledOnce();
     expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it('removes only requested links from the target subcategory', async () => {
+    connection.execute.mockImplementation(async (sql: string, values: number[]) => {
+      if (sql.startsWith('SELECT TABLE_NAME')) return [[...Array(3)].map(() => ({ ENGINE: 'InnoDB' }))];
+      if (sql.startsWith('SELECT id_subcategoria')) return [[{ id_subcategoria: 9 }]];
+      if (sql.startsWith('SELECT id_produto FROM produtos')) return [values.slice(1).map((id) => ({ id_produto: id }))];
+      if (sql.startsWith('DELETE FROM aux_subcategorias_produtos')) return [{ affectedRows: 2 }];
+      return [[]];
+    });
+    expect(await SubcategoryProductsService.assign(7, 9, [], [4, 5])).toEqual({
+      processed: 2, changed: 2, added: 0, removed: 2,
+    });
+    const removal = connection.execute.mock.calls.find(([sql]) => sql.startsWith('DELETE FROM aux_subcategorias_produtos'));
+    expect(removal?.[0]).toContain('id_empresa = ? AND id_subcategoria = ?');
+    expect(removal?.[1]).toEqual([7, 9, 4, 5]);
+    expect(connection.commit).toHaveBeenCalledOnce();
+  });
+
+  it('rejects the same product in additions and removals', async () => {
+    await expect(SubcategoryProductsService.assign(7, 9, [4], [4]))
+      .rejects.toMatchObject({ code: 'INVALID_SELECTION' });
+    expect(getConnection).not.toHaveBeenCalled();
   });
 
   it('refuses nontransactional tables before beginning a transaction', async () => {

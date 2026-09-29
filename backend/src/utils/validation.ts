@@ -130,6 +130,16 @@ export const vincularProdutosLoteSchema = Joi.object({
   produto_ids: Joi.array().items(Joi.number().integer().positive()).min(1).max(50000).required(),
 });
 
+export const editarProdutosSubcategoriaLoteSchema = Joi.object({
+  produto_ids: Joi.array().items(Joi.number().integer().positive()).max(50000).default([]),
+  remover_produto_ids: Joi.array().items(Joi.number().integer().positive()).max(50000).default([]),
+}).custom((value, helpers) => {
+  if (!value.produto_ids.length && !value.remover_produto_ids.length) {
+    return helpers.error('any.custom');
+  }
+  return value;
+});
+
 export const grupoPermissaoSchema = Joi.object({
   permissao: Joi.string().trim().min(1).max(100).required(),
 });

@@ -32,16 +32,28 @@ export class SubcategoryProductsService {
     return { ...products, page, limit, totalPages: Math.ceil(products.total / limit), linked_ids: links.map((row) => Number(row.id_produto)) };
   }
 
-  static async assign(empresaId: number, subcategoriaId: number, requestedIds: number[]) {
+  static async assign(empresaId: number, subcategoriaId: number, requestedIds: number[], requestedRemovalIds: number[] = []) {
     if (!Number.isSafeInteger(subcategoriaId) || subcategoriaId <= 0) {
       throwError('INVALID_SUBCATEGORY', 'Subcategoria invalida', 400);
     }
-    if (!Array.isArray(requestedIds) || !requestedIds.length || requestedIds.length > SUBCATEGORY_SELECTION_LIMIT
-      || requestedIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
-      throwError('INVALID_SELECTION', 'Selecione de 1 a 50000 produtos validos', 400);
+    if (!Array.isArray(requestedIds) || !Array.isArray(requestedRemovalIds)
+      || (!requestedIds.length && !requestedRemovalIds.length)
+      || requestedIds.length > SUBCATEGORY_SELECTION_LIMIT || requestedRemovalIds.length > SUBCATEGORY_SELECTION_LIMIT
+      || requestedIds.some((id) => !Number.isSafeInteger(id) || id <= 0)
+      || requestedRemovalIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      throwError('INVALID_SELECTION', 'Selecione de 1 a 50000 produtos validos para adicionar ou remover', 400);
     }
 
-    const ids = [...new Set(requestedIds)].sort((a, b) => a - b);
+    const addIds = [...new Set(requestedIds)].sort((a, b) => a - b);
+    const removeIds = [...new Set(requestedRemovalIds)].sort((a, b) => a - b);
+    const removeSet = new Set(removeIds);
+    if (addIds.some((id) => removeSet.has(id))) {
+      throwError('INVALID_SELECTION', 'Um produto nao pode ser adicionado e removido ao mesmo tempo', 400);
+    }
+    const ids = [...addIds, ...removeIds].sort((a, b) => a - b);
+    if (ids.length > SUBCATEGORY_SELECTION_LIMIT) {
+      throwError('INVALID_SELECTION', 'Selecione ate 50000 produtos no total para adicionar ou remover', 400);
+    }
     const connection = await getConnection();
     let transactionStarted = false;
     try {
@@ -71,8 +83,9 @@ export class SubcategoryProductsService {
         }
       }
 
-      let changed = 0;
-      for (const chunk of chunks) {
+      let added = 0;
+      for (let start = 0; start < addIds.length; start += 500) {
+        const chunk = addIds.slice(start, start + 500);
         const placeholders = chunk.map(() => '?').join(',');
         const [links] = await connection.execute(`SELECT id_produto FROM aux_subcategorias_produtos
           WHERE id_empresa = ? AND id_subcategoria = ? AND id_produto IN (${placeholders}) FOR UPDATE`, [empresaId, subcategoriaId, ...chunk]);
@@ -81,11 +94,20 @@ export class SubcategoryProductsService {
         if (missing.length) {
           await connection.execute(`INSERT INTO aux_subcategorias_produtos (id_empresa, id_subcategoria, id_produto)
             VALUES ${missing.map(() => '(?,?,?)').join(',')}`, missing.flatMap((id) => [empresaId, subcategoriaId, id]));
-          changed += missing.length;
+          added += missing.length;
         }
       }
+
+      let removed = 0;
+      for (let start = 0; start < removeIds.length; start += 500) {
+        const chunk = removeIds.slice(start, start + 500);
+        const placeholders = chunk.map(() => '?').join(',');
+        const [result] = await connection.execute(`DELETE FROM aux_subcategorias_produtos
+          WHERE id_empresa = ? AND id_subcategoria = ? AND id_produto IN (${placeholders})`, [empresaId, subcategoriaId, ...chunk]);
+        removed += Number((result as { affectedRows?: number }).affectedRows || 0);
+      }
       await connection.commit();
-      return { processed: ids.length, changed };
+      return { processed: ids.length, changed: added + removed, added, removed };
     } catch (error) {
       if (transactionStarted) await connection.rollback();
       throw error;

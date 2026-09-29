@@ -35,6 +35,8 @@ export function CategoryProductsModal({
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
   const selectController = useRef<AbortController | null>(null);
+  const initialLinked = useRef<Set<number>>(new Set());
+  const initializedSubcategory = useRef(false);
   const savingRef = useRef(false);
   const selectingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,15 @@ export function CategoryProductsModal({
       signal: controller.signal,
     })
       .then((response) => {
-        if (!controller.signal.aborted) setData(response);
+        if (!controller.signal.aborted) {
+          setData(response);
+          if (entityLabel === "subcategoria" && !initializedSubcategory.current) {
+            const linkedProducts = new Set(response.linked_ids);
+            initialLinked.current = linkedProducts;
+            initializedSubcategory.current = true;
+            setSelected(new Set(linkedProducts));
+          }
+        }
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
@@ -86,7 +96,7 @@ export function CategoryProductsModal({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [endpoint, filter, excludeFilter, page, revision]);
+  }, [endpoint, entityLabel, filter, excludeFilter, page, revision]);
 
   async function selectAll() {
     if (selectingRef.current || savingRef.current) return;
@@ -118,23 +128,37 @@ export function CategoryProductsModal({
   }
 
   async function save() {
-    if (savingRef.current || selectingRef.current || !selected.size) return;
+    const addedIds = entityLabel === "subcategoria"
+      ? [...selected].filter((id) => !initialLinked.current.has(id))
+      : [...selected];
+    const removedIds = entityLabel === "subcategoria"
+      ? [...initialLinked.current].filter((id) => !selected.has(id))
+      : [];
+    if (savingRef.current || selectingRef.current || (!addedIds.length && !removedIds.length)) return;
     savingRef.current = true;
     setSaving(true);
     setError("");
     setMessage("");
     try {
-      const result = await apiRequest<{ processed: number; changed: number }>(
+      const result = await apiRequest<{ processed: number; changed: number; added?: number; removed?: number }>(
         `${endpoint}/lote`,
         {
           method: "POST",
-          body: JSON.stringify({ produto_ids: [...selected] }),
+          body: JSON.stringify({
+            produto_ids: addedIds,
+            ...(entityLabel === "subcategoria" ? { remover_produto_ids: removedIds } : {}),
+          }),
         },
       );
       setSelected(new Set());
-      setMessage(
-        `${result.processed} produtos cadastrados na ${entityLabel}. ${result.changed} alterados.`,
-      );
+      if (entityLabel === "subcategoria") {
+        setMessage(`${result.added || 0} produtos adicionados e ${result.removed || 0} removidos da subcategoria.`);
+        initialLinked.current = new Set();
+        initializedSubcategory.current = false;
+        setData(null);
+      } else {
+        setMessage(`${result.processed} produtos cadastrados na categoria. ${result.changed} alterados.`);
+      }
       setRevision((value) => value + 1);
     } catch (err) {
       setError(
@@ -148,6 +172,13 @@ export function CategoryProductsModal({
 
   const busy = saving || selecting;
   const linked = new Set(data?.linked_ids || []);
+  const addedCount = entityLabel === "subcategoria"
+    ? [...selected].filter((id) => !initialLinked.current.has(id)).length
+    : selected.size;
+  const removedCount = entityLabel === "subcategoria"
+    ? [...initialLinked.current].filter((id) => !selected.has(id)).length
+    : 0;
+  const hasChanges = addedCount > 0 || removedCount > 0;
   const waitingFilter = search.trim() !== filter || exclude.trim() !== excludeFilter;
   const buttonClass =
     "rounded-md border border-stroke px-3 py-2 text-sm font-semibold disabled:opacity-40 dark:border-dark-3";
@@ -254,10 +285,12 @@ export function CategoryProductsModal({
               disabled={busy || !selected.size}
               onClick={() => setSelected(new Set())}
             >
-              Limpar seleção
+              {entityLabel === "subcategoria" ? "Desmarcar todos" : "Limpar seleção"}
             </button>
             <span className="text-sm font-semibold" aria-live="polite">
-              {selected.size} selecionados
+              {entityLabel === "subcategoria"
+                ? `${addedCount} para adicionar · ${removedCount} para remover`
+                : `${selected.size} selecionados`}
             </span>
           </div>
         </header>
@@ -309,7 +342,11 @@ export function CategoryProductsModal({
                     </p>
                     <p className="text-xs text-dark-4">
                       #{product.id_produto} · {product.codigo || "Sem código"}
-                      {linked.has(product.id_produto) ? " · Vinculado" : ""}
+                      {entityLabel === "subcategoria" && linked.has(product.id_produto) && !selected.has(product.id_produto)
+                        ? " · Remover ao salvar"
+                        : entityLabel === "subcategoria" && !linked.has(product.id_produto) && selected.has(product.id_produto)
+                          ? " · Adicionar ao salvar"
+                          : linked.has(product.id_produto) ? " · Vinculado" : ""}
                     </p>
                   </div>
                 </label>
@@ -354,18 +391,20 @@ export function CategoryProductsModal({
           <p className="text-sm text-dark-4">
             {entityLabel === "categoria"
               ? "Os selecionados terão suas categorias substituídas por esta. Subcategorias de outras categorias serão removidas."
-              : "Os selecionados serão adicionados a esta subcategoria, preservando categorias e outras subcategorias vinculadas."}{" "}
+              : "Marque para adicionar e desmarque para remover desta subcategoria. Categorias e outras subcategorias serão preservadas."}{" "}
             Selecionar não altera os produtos.
           </p>
           <button
             type="button"
-            disabled={busy || !selected.size}
+            disabled={busy || !hasChanges}
             onClick={save}
             className="w-full rounded-md bg-primary px-4 py-3 text-sm font-bold text-white disabled:opacity-40 sm:w-auto"
           >
             {saving
-              ? entityLabel === "categoria" ? "Cadastrando..." : "Adicionando..."
-              : `${entityLabel === "categoria" ? "Cadastrar" : "Adicionar"} selecionados na ${entityLabel} (${selected.size})`}
+              ? entityLabel === "categoria" ? "Cadastrando..." : "Salvando..."
+              : entityLabel === "categoria"
+                ? `Cadastrar selecionados na categoria (${selected.size})`
+                : `Salvar alterações (${addedCount + removedCount})`}
           </button>
         </footer>
       </div>
