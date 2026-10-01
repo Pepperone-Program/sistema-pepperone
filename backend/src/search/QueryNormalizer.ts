@@ -8,6 +8,7 @@ export const normalizeComparable = (value: string): string =>
   stripAccents(value.normalize('NFKC'))
     .toLocaleLowerCase('pt-BR')
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .replace(/[\p{Pd}\u00ad]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 

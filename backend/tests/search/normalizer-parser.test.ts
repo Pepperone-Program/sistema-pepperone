@@ -5,6 +5,15 @@ import { QueryParser } from '../../src/search/QueryParser';
 import { buildCandidateBooleanQueries } from '../../src/search/CandidateRetriever';
 
 describe('public product query interpretation', () => {
+  it.each([
+    ['anti-stress', 'anti stress'],
+    ['anti stress', 'anti stress'],
+    ['guarda-chuva', 'guarda chuva'],
+    ['guarda–chuva', 'guarda chuva'],
+  ])('treats hyphens as word separators in %s', (query, expected) => {
+    expect(normalizeSearchQuery(query).normalized).toBe(expected);
+  });
+
   it('normalizes unicode, accents, controls and whitespace', () => {
     expect(normalizeSearchQuery('  GARRAFA\u0000  TÉRMICA   500 ML ').normalized).toBe('garrafa termica 500 ml');
   });

@@ -10,6 +10,15 @@ const candidate = (id: number, name: string, type: string, overrides: Partial<Se
 });
 
 describe('public relevance final gate', () => {
+  it.each([
+    ['anti stress', 'Anti-Stress Redondo Personalizado'],
+    ['guarda chuva', 'Guarda-Chuva Automático Personalizado'],
+  ])('matches a query without hyphen to the hyphenated product name: %s', (query, productName) => {
+    const parsed = QueryParser.parse(query);
+    const ranked = ProductRankingEngine.rank(parsed, [candidate(1, productName, 'outro')]);
+    expect(filterRelevantCandidates(parsed, ranked).map((item) => item.product.id_produto)).toEqual([1]);
+  });
+
   it('never promotes unrelated products for mochila', () => {
     const parsed = QueryParser.parse('mochila');
     const ranked = ProductRankingEngine.rank(parsed, [
