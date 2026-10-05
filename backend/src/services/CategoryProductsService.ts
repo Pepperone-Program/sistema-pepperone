@@ -28,13 +28,25 @@ export class CategoryProductsService {
     return { ...products, page, limit, totalPages: Math.ceil(products.total / limit), linked_ids: links.map((row) => Number(row.id_produto)) };
   }
 
-  static async assign(empresaId: number, categoriaId: number, requestedIds: number[]) {
+  static async assign(empresaId: number, categoriaId: number, requestedIds: number[] = [], requestedRemovalIds: number[] = []) {
     if (!Number.isSafeInteger(categoriaId) || categoriaId <= 0) throwError('INVALID_CATEGORY', 'Categoria invalida', 400);
-    if (!Array.isArray(requestedIds) || !requestedIds.length || requestedIds.length > CATEGORY_SELECTION_LIMIT
-      || requestedIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
-      throwError('INVALID_SELECTION', 'Selecione de 1 a 50000 produtos validos', 400);
+    if (!Array.isArray(requestedIds) || !Array.isArray(requestedRemovalIds)
+      || (!requestedIds.length && !requestedRemovalIds.length)
+      || requestedIds.length > CATEGORY_SELECTION_LIMIT || requestedRemovalIds.length > CATEGORY_SELECTION_LIMIT
+      || requestedIds.some((id) => !Number.isSafeInteger(id) || id <= 0)
+      || requestedRemovalIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      throwError('INVALID_SELECTION', 'Selecione de 1 a 50000 produtos validos para adicionar ou remover', 400);
     }
-    const ids = [...new Set(requestedIds)].sort((a, b) => a - b);
+    const addIds = [...new Set(requestedIds)].sort((a, b) => a - b);
+    const removeIds = [...new Set(requestedRemovalIds)].sort((a, b) => a - b);
+    const removeSet = new Set(removeIds);
+    if (addIds.some((id) => removeSet.has(id))) {
+      throwError('INVALID_SELECTION', 'Um produto nao pode ser adicionado e removido ao mesmo tempo', 400);
+    }
+    const ids = [...addIds, ...removeIds].sort((a, b) => a - b);
+    if (ids.length > CATEGORY_SELECTION_LIMIT) {
+      throwError('INVALID_SELECTION', 'Selecione ate 50000 produtos no total para adicionar ou remover', 400);
+    }
     const connection = await getConnection();
     let transactionStarted = false;
     try {
@@ -49,16 +61,16 @@ export class CategoryProductsService {
       const [categories] = await connection.execute('SELECT id_categoria FROM categorias WHERE id_empresa = ? AND id_categoria = ? LOCK IN SHARE MODE', [empresaId, categoriaId]);
       if (!(categories as unknown[]).length) throwError('CATEGORIA_NOT_FOUND', 'Categoria nao encontrada', 404);
       // Lock and validate the entire selection before any write. Ascending IDs serialize overlapping batches.
-      const chunks: number[][] = [];
-      for (let start = 0; start < ids.length; start += 500) {
-        const chunk = ids.slice(start, start + 500);
-        chunks.push(chunk);
+      const addChunks: number[][] = [];
+      for (let start = 0; start < addIds.length; start += 500) {
+        const chunk = addIds.slice(start, start + 500);
+        addChunks.push(chunk);
         const [rows] = await connection.execute(`SELECT id_produto FROM produtos WHERE id_empresa = ?
           AND id_produto IN (${chunk.map(() => '?').join(',')}) ORDER BY id_produto FOR UPDATE`, [empresaId, ...chunk]);
         if ((rows as unknown[]).length !== chunk.length) throwError('INVALID_SELECTION', 'Um ou mais produtos nao existem nesta empresa. Atualize a selecao.', 422);
       }
       const changed = new Set<number>();
-      for (const chunk of chunks) {
+      for (const chunk of addChunks) {
         const placeholders = chunk.map(() => '?').join(',');
         const [links] = await connection.execute(`SELECT id_produto, id_categoria FROM aux_categorias_produtos
           WHERE id_empresa = ? AND id_produto IN (${placeholders}) FOR UPDATE`, [empresaId, ...chunk]);
@@ -86,8 +98,15 @@ export class CategoryProductsService {
           LEFT JOIN subcategorias s ON s.id_empresa = asp.id_empresa AND s.id_subcategoria = asp.id_subcategoria
           WHERE asp.id_empresa = ? AND asp.id_produto IN (${placeholders}) AND (s.id_categoria IS NULL OR s.id_categoria <> ?)`, [empresaId, ...chunk, categoriaId]);
       }
+      let removed = 0;
+      for (let start = 0; start < removeIds.length; start += 500) {
+        const chunk = removeIds.slice(start, start + 500);
+        const [result] = await connection.execute(`DELETE FROM aux_categorias_produtos
+          WHERE id_empresa = ? AND id_categoria = ? AND id_produto IN (${chunk.map(() => '?').join(',')})`, [empresaId, categoriaId, ...chunk]);
+        removed += Number((result as { affectedRows?: number }).affectedRows || 0);
+      }
       await connection.commit();
-      return { processed: ids.length, changed: changed.size };
+      return { processed: ids.length, changed: changed.size + removed, added: changed.size, removed };
     } catch (error) {
       if (transactionStarted) await connection.rollback();
       throw error;

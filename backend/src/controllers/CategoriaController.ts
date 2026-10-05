@@ -27,9 +27,14 @@ export class CategoriaController {
 
   static async assignProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const result = await CategoryProductsService.assign(req.user!.id_empresa, Number(req.params.id), req.body?.produto_ids);
+      const result = await CategoryProductsService.assign(
+        req.user!.id_empresa,
+        Number(req.params.id),
+        req.body?.produto_ids,
+        req.body?.remover_produto_ids
+      );
       await CacheService.invalidateNamespaces(['categorias', 'produtos', 'subcategorias', 'publicos-alvos', 'datas-promocionais', 'search', 'search-v2']);
-      successResponse(res, result, 'Produtos cadastrados na categoria');
+      successResponse(res, result, 'Vinculos de produtos atualizados na categoria');
     } catch (error) {
       const err = error as any;
       errorResponse(res, err.code || 'ERROR', err.message, err.statusCode || 500);

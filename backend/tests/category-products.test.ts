@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('transactional category assignment', () => {
   it('assigns uncategorized products, replaces previous links, and preserves correct links', async () => {
-    expect(await CategoryProductsService.assign(7, 8, [3, 2, 1, 1])).toEqual({ processed: 3, changed: 2 });
+    expect(await CategoryProductsService.assign(7, 8, [3, 2, 1, 1])).toEqual({ processed: 3, changed: 2, added: 2, removed: 0 });
     const insert = connection.execute.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO aux_categorias'));
     expect(insert?.[1]).toEqual([7, 8, 1, 7, 8, 2]);
     const lock = connection.execute.mock.calls.find(([sql]) => sql.startsWith('SELECT id_produto FROM produtos'));
@@ -54,7 +54,7 @@ describe('transactional category assignment', () => {
   });
 
   it('is idempotent for a product already assigned only to the target category', async () => {
-    expect(await CategoryProductsService.assign(7, 8, [3, 3])).toEqual({ processed: 1, changed: 0 });
+    expect(await CategoryProductsService.assign(7, 8, [3, 3])).toEqual({ processed: 1, changed: 0, added: 0, removed: 0 });
     expect(connection.execute.mock.calls.some(([sql]) => /^(INSERT INTO|DELETE FROM) aux_categorias/.test(sql))).toBe(false);
     expect(connection.commit).toHaveBeenCalledOnce();
   });
@@ -69,6 +69,30 @@ describe('transactional category assignment', () => {
     expect(connection.rollback).toHaveBeenCalledOnce();
     expect(connection.commit).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledOnce();
+  });
+
+  it('removes only requested links from the target category without requiring product rows', async () => {
+    connection.execute.mockImplementation(async (sql: string, values: number[]) => {
+      if (sql.startsWith('SELECT TABLE_NAME')) return [[...Array(5)].map(() => ({ ENGINE: 'InnoDB' }))];
+      if (sql.startsWith('SELECT id_categoria')) return [[{ id_categoria: 8 }]];
+      if (sql.startsWith('DELETE FROM aux_categorias_produtos')) return [{ affectedRows: 2 }];
+      return [[]];
+    });
+    expect(await CategoryProductsService.assign(7, 8, [], [4, 5])).toEqual({
+      processed: 2, changed: 2, added: 0, removed: 2,
+    });
+    const removal = connection.execute.mock.calls.find(([sql]) => sql.startsWith('DELETE FROM aux_categorias_produtos'));
+    expect(removal?.[0]).toContain('id_empresa = ? AND id_categoria = ?');
+    expect(removal?.[1]).toEqual([7, 8, 4, 5]);
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith('SELECT id_produto FROM produtos'))).toBe(false);
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith('DELETE asp'))).toBe(false);
+    expect(connection.commit).toHaveBeenCalledOnce();
+  });
+
+  it('rejects the same product in additions and removals', async () => {
+    await expect(CategoryProductsService.assign(7, 8, [4], [4]))
+      .rejects.toMatchObject({ code: 'INVALID_SELECTION' });
+    expect(getConnection).not.toHaveBeenCalled();
   });
 
   it('rejects invalid input before opening a transaction', async () => {

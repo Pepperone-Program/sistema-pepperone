@@ -36,7 +36,7 @@ export function CategoryProductsModal({
   const [revision, setRevision] = useState(0);
   const selectController = useRef<AbortController | null>(null);
   const initialLinked = useRef<Set<number>>(new Set());
-  const initializedSubcategory = useRef(false);
+  const initializedLinks = useRef(false);
   const savingRef = useRef(false);
   const selectingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -66,6 +66,12 @@ export function CategoryProductsModal({
   }, [search, exclude]);
 
   useEffect(() => {
+    initialLinked.current = new Set();
+    initializedLinks.current = false;
+    setSelected(new Set());
+  }, [endpoint]);
+
+  useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -76,10 +82,10 @@ export function CategoryProductsModal({
       .then((response) => {
         if (!controller.signal.aborted) {
           setData(response);
-          if (entityLabel === "subcategoria" && !initializedSubcategory.current) {
+          if (!initializedLinks.current) {
             const linkedProducts = new Set(response.linked_ids);
             initialLinked.current = linkedProducts;
-            initializedSubcategory.current = true;
+            initializedLinks.current = true;
             setSelected(new Set(linkedProducts));
           }
         }
@@ -127,13 +133,42 @@ export function CategoryProductsModal({
     }
   }
 
+  async function unselectAllFiltered() {
+    if (selectingRef.current || savingRef.current) return;
+    selectingRef.current = true;
+    const controller = new AbortController();
+    selectController.current = controller;
+    setSelecting(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await apiRequest<{ produto_ids: number[] }>(
+        `${endpoint}/disponiveis`,
+        {
+          query: { search: filter, exclude: excludeFilter, ids_only: 1 },
+          signal: controller.signal,
+        },
+      );
+      if (!controller.signal.aborted) {
+        setSelected((current) => {
+          const next = new Set(current);
+          result.produto_ids.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : "Falha ao desmarcar produtos");
+      }
+    } finally {
+      selectingRef.current = false;
+      if (!controller.signal.aborted) setSelecting(false);
+    }
+  }
+
   async function save() {
-    const addedIds = entityLabel === "subcategoria"
-      ? [...selected].filter((id) => !initialLinked.current.has(id))
-      : [...selected];
-    const removedIds = entityLabel === "subcategoria"
-      ? [...initialLinked.current].filter((id) => !selected.has(id))
-      : [];
+    const addedIds = [...selected].filter((id) => !initialLinked.current.has(id));
+    const removedIds = [...initialLinked.current].filter((id) => !selected.has(id));
     if (savingRef.current || selectingRef.current || (!addedIds.length && !removedIds.length)) return;
     savingRef.current = true;
     setSaving(true);
@@ -146,7 +181,7 @@ export function CategoryProductsModal({
           method: "POST",
           body: JSON.stringify({
             produto_ids: addedIds,
-            ...(entityLabel === "subcategoria" ? { remover_produto_ids: removedIds } : {}),
+            remover_produto_ids: removedIds,
           }),
         },
       );
@@ -154,12 +189,12 @@ export function CategoryProductsModal({
       if (entityLabel === "subcategoria") {
         const skippedMessage = result.skipped ? ` ${result.skipped} não foram adicionados porque não existem mais nesta empresa.` : "";
         setMessage(`${result.added || 0} produtos adicionados e ${result.removed || 0} removidos da subcategoria.${skippedMessage}`);
-        initialLinked.current = new Set();
-        initializedSubcategory.current = false;
-        setData(null);
       } else {
-        setMessage(`${result.processed} produtos cadastrados na categoria. ${result.changed} alterados.`);
+        setMessage(`${result.added || 0} produtos vinculados e ${result.removed || 0} removidos da categoria.`);
       }
+      initialLinked.current = new Set();
+      initializedLinks.current = false;
+      setData(null);
       setRevision((value) => value + 1);
     } catch (err) {
       setError(
@@ -173,12 +208,8 @@ export function CategoryProductsModal({
 
   const busy = saving || selecting;
   const linked = new Set(data?.linked_ids || []);
-  const addedCount = entityLabel === "subcategoria"
-    ? [...selected].filter((id) => !initialLinked.current.has(id)).length
-    : selected.size;
-  const removedCount = entityLabel === "subcategoria"
-    ? [...initialLinked.current].filter((id) => !selected.has(id)).length
-    : 0;
+  const addedCount = [...selected].filter((id) => !initialLinked.current.has(id)).length;
+  const removedCount = [...initialLinked.current].filter((id) => !selected.has(id)).length;
   const hasChanges = addedCount > 0 || removedCount > 0;
   const waitingFilter = search.trim() !== filter || exclude.trim() !== excludeFilter;
   const buttonClass =
@@ -283,15 +314,15 @@ export function CategoryProductsModal({
             <button
               type="button"
               className={buttonClass}
-              disabled={busy || !selected.size}
-              onClick={() => setSelected(new Set())}
+              disabled={busy || loading || waitingFilter || !data?.total}
+              onClick={unselectAllFiltered}
             >
-              {entityLabel === "subcategoria" ? "Desmarcar todos" : "Limpar seleção"}
+              {selecting
+                ? "Aguarde..."
+                : `Desmarcar todos do filtro${data ? ` (${data.total})` : ""}`}
             </button>
             <span className="text-sm font-semibold" aria-live="polite">
-              {entityLabel === "subcategoria"
-                ? `${addedCount} para adicionar · ${removedCount} para remover`
-                : `${selected.size} selecionados`}
+              {addedCount} para adicionar · {removedCount} para remover
             </span>
           </div>
         </header>
@@ -343,9 +374,9 @@ export function CategoryProductsModal({
                     </p>
                     <p className="text-xs text-dark-4">
                       #{product.id_produto} · {product.codigo || "Sem código"}
-                      {entityLabel === "subcategoria" && linked.has(product.id_produto) && !selected.has(product.id_produto)
+                      {linked.has(product.id_produto) && !selected.has(product.id_produto)
                         ? " · Remover ao salvar"
-                        : entityLabel === "subcategoria" && !linked.has(product.id_produto) && selected.has(product.id_produto)
+                        : !linked.has(product.id_produto) && selected.has(product.id_produto)
                           ? " · Adicionar ao salvar"
                           : linked.has(product.id_produto) ? " · Vinculado" : ""}
                     </p>
@@ -391,7 +422,7 @@ export function CategoryProductsModal({
           </div>
           <p className="text-sm text-dark-4">
             {entityLabel === "categoria"
-              ? "Os selecionados terão suas categorias substituídas por esta. Subcategorias de outras categorias serão removidas."
+              ? "Marque para vincular e desmarque para remover desta categoria. Novos vínculos substituem a categoria anterior e removem subcategorias incompatíveis; remoções preservam as subcategorias existentes."
               : "Marque para adicionar e desmarque para remover desta subcategoria. Categorias e outras subcategorias serão preservadas."}{" "}
             Selecionar não altera os produtos.
           </p>
@@ -402,10 +433,8 @@ export function CategoryProductsModal({
             className="w-full rounded-md bg-primary px-4 py-3 text-sm font-bold text-white disabled:opacity-40 sm:w-auto"
           >
             {saving
-              ? entityLabel === "categoria" ? "Cadastrando..." : "Salvando..."
-              : entityLabel === "categoria"
-                ? `Cadastrar selecionados na categoria (${selected.size})`
-                : `Salvar alterações (${addedCount + removedCount})`}
+              ? "Salvando..."
+              : `Salvar alterações (${addedCount + removedCount})`}
           </button>
         </footer>
       </div>
