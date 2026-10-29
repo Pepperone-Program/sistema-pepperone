@@ -6,25 +6,34 @@ import {
   DropdownContent,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
-import { clearStoredToken } from "@/lib/api";
+import { apiRequest, clearStoredToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LogOutIcon, SettingsIcon, UserIcon } from "./icons";
 
 export function UserInfo() {
   const [isOpen, setIsOpen] = useState(false);
+  const [profile, setProfile] = useState<{ nome?: string; usuario?: string; email?: string }>({});
+  useEffect(() => {
+    let active = true;
+    apiRequest<{ nome?: string; usuario?: string; email?: string }>("/api/v1/usuarios/profile")
+      .then((user) => { if (active) setProfile(user); })
+      .catch(() => { if (active) setProfile({}); });
+    return () => { active = false; };
+  }, []);
 
   async function handleLogout() {
     clearStoredToken();
+    window.sessionStorage.removeItem("pepperone_profile");
     await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
     window.location.href = "/login";
   }
 
   const USER = {
-    name: "",
-    email: "",
+    name: profile.nome || profile.usuario || "Conta",
+    email: profile.email || "",
     img: "/images/user/user.jpg",
   };
 
@@ -42,7 +51,7 @@ export function UserInfo() {
             width={200}
             height={200}
           />
-          <figcaption className="flex items-center gap-1 font-medium text-dark dark:text-dark-6 max-[1024px]:sr-only">
+          <figcaption className="flex max-w-36 items-center gap-1 font-medium text-dark dark:text-dark-6 sm:max-w-48">
             <span>{USER.name}</span>
 
             <ChevronUpIcon

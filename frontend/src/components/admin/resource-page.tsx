@@ -11,6 +11,7 @@ import type { ResourceConfig, ResourceField } from "@/types/admin";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { StatusBadge } from "./status-badge";
 import { ProductImagesPanel } from "./product-images-panel";
+import { toast } from "@/components/ui/toast";
 
 type Row = Record<string, unknown>;
 
@@ -97,6 +98,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
   const [habilitado, setHabilitado] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Row | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -134,7 +136,8 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
     setSaving(true);
     setError("");
 
-    const formData = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const formData = new FormData(formElement);
     const payload = config.formFields.reduce<Record<string, unknown>>((acc, field) => {
       const value = normalizeValue(field, formData.get(field.name));
       if (value !== undefined) acc[field.name] = value;
@@ -147,10 +150,12 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
       } else {
         await createResource(config.endpoint, payload);
       }
+      toast.add({ type: "success", description: selected ? "Alterações salvas." : "Registro criado." });
 
+      formElement.reset();
       setSelected(null);
+      setFormOpen(false);
       await loadData();
-      event.currentTarget.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar");
     } finally {
@@ -167,6 +172,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
 
     try {
       await deleteResource(config.endpoint, String(id));
+      toast.add({ type: "success", description: "Registro excluído." });
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao excluir");
@@ -190,6 +196,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <button className="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white" onClick={() => { setSelected(null); setFormOpen(true); }} type="button">Criar</button>
             <button
               className="rounded-md border border-stroke px-4 py-2.5 text-sm font-semibold text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:text-white"
               onClick={() => {
@@ -211,7 +218,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div>
         <section className="rounded-lg bg-white shadow-1 dark:bg-gray-dark">
           <div className="flex flex-col gap-3 border-b border-stroke p-4 dark:border-dark-3 md:flex-row md:items-center md:justify-between">
             <input
@@ -262,6 +269,13 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
                       className={`border-b border-stroke text-dark hover:bg-gray-2 dark:border-dark-3 dark:text-white dark:hover:bg-dark-2 ${onRowClick ? "cursor-pointer" : ""}`}
                       key={String(row[config.idField])}
                       onClick={() => onRowClick?.(row)}
+                      tabIndex={onRowClick ? 0 : undefined}
+                      onKeyDown={(event) => {
+                        if (onRowClick && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      }}
                     >
                       {config.columns.map((column) => (
                         <td className="max-w-[280px] px-4 py-3" key={column.name}>
@@ -272,7 +286,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
                         <div className="flex justify-end gap-2">
                           <button
                             className="rounded-md border border-stroke px-3 py-1.5 text-xs font-semibold hover:border-primary hover:text-primary dark:border-dark-3"
-                            onClick={() => setSelected(row)}
+                            onClick={() => { setSelected(row); setFormOpen(true); }}
                             type="button"
                           >
                             Editar
@@ -327,7 +341,8 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
           </div>
         </section>
 
-        <aside className="rounded-lg bg-white p-5 shadow-1 dark:bg-gray-dark">
+        {formOpen && <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" onMouseDown={() => setFormOpen(false)}>
+        <aside role="dialog" aria-modal="true" aria-label={selected ? "Editar registro" : "Novo registro"} onMouseDown={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-1 dark:bg-gray-dark">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-dark dark:text-white">
@@ -337,16 +352,16 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
                 Campos desconhecidos sao ignorados pela API.
               </p>
             </div>
-            {selected && (
               <button
                 className="rounded-md border border-stroke px-3 py-1.5 text-xs font-semibold dark:border-dark-3"
-                onClick={() => setSelected(null)}
+                onClick={() => setFormOpen(false)}
                 type="button"
               >
-                Limpar
+                Fechar
               </button>
-            )}
           </div>
+
+          {error && <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <form className="space-y-4" onSubmit={handleSubmit} key={selected ? String(selected[config.idField]) : "new"}>
             {config.formFields.map((field) => (
@@ -374,6 +389,7 @@ export function ResourcePage({ config, onRowClick }: { config: ResourceConfig; o
             </button>
           </form>
         </aside>
+        </div>}
       </div>
 
       {config.imageManager && selected && (

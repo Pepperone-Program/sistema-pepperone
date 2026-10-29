@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";
 import type { PropsWithChildren } from "react";
 import { Providers } from "./providers";
+import { Toaster } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
   title: {
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
         <Providers>
           <NextTopLoader color="#b91c1c" showSpinner={false} />
           <AppShell>{children}</AppShell>
+          <Toaster />
         </Providers>
       </body>
     </html>

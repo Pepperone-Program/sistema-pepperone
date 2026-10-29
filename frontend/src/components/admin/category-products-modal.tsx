@@ -1,5 +1,7 @@
 "use client";
 
+import { FeedbackToast } from "@/components/ui/toast";
+
 import { apiRequest, type PaginatedData } from "@/lib/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -188,6 +190,7 @@ export function CategoryProductsModal({
       setSelected(new Set());
       if (entityLabel === "subcategoria") {
         const skippedMessage = result.skipped ? ` ${result.skipped} não foram adicionados porque não existem mais nesta empresa.` : "";
+        if (skippedMessage) setError(`${result.skipped} produtos não foram adicionados porque não existem mais nesta empresa.`);
         setMessage(`${result.added || 0} produtos adicionados e ${result.removed || 0} removidos da subcategoria.${skippedMessage}`);
       } else {
         setMessage(`${result.added || 0} produtos vinculados e ${result.removed || 0} removidos da categoria.`);
@@ -335,14 +338,7 @@ export function CategoryProductsModal({
               {error}
             </p>
           )}
-          {message && (
-            <p
-              role="status"
-              className="mb-3 rounded-md bg-green-50 p-3 text-sm text-green-800"
-            >
-              {message}
-            </p>
-          )}
+          <FeedbackToast message={message} type="success" />
           {loading || waitingFilter ? (
             <p className="py-10 text-center">Carregando produtos...</p>
           ) : (

@@ -213,7 +213,7 @@ export class ProdutoModel {
     return result.affectedRows > 0;
   }
 
-  static async findProductLinks(produtoId: number) {
+  static async findProductLinks(empresaId: number, produtoId: number) {
     const [categorias, subcategorias, publicosAlvos, datasPromocionais] = await Promise.all([
       query(
         `
@@ -221,10 +221,10 @@ export class ProdutoModel {
           FROM aux_categorias_produtos acp
           INNER JOIN categorias c
             ON c.id_empresa = acp.id_empresa AND c.id_categoria = acp.id_categoria
-          WHERE acp.id_produto = ?
+          WHERE acp.id_empresa = ? AND acp.id_produto = ?
           ORDER BY c.categoria ASC
         `,
-        [produtoId]
+        [empresaId, produtoId]
       ),
       query(
         `
@@ -232,10 +232,10 @@ export class ProdutoModel {
           FROM aux_subcategorias_produtos asp
           INNER JOIN subcategorias s
             ON s.id_empresa = asp.id_empresa AND s.id_subcategoria = asp.id_subcategoria
-          WHERE asp.id_produto = ?
+          WHERE asp.id_empresa = ? AND asp.id_produto = ?
           ORDER BY s.ordem ASC, s.subcategoria ASC
         `,
-        [produtoId]
+        [empresaId, produtoId]
       ),
       query(
         `

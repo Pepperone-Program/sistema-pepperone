@@ -1,11 +1,10 @@
 "use client";
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
-import { apiRequest, setStoredToken } from "@/lib/api";
+import { apiRequest, clearStoredToken } from "@/lib/api";
 import React, { useState } from "react";
 import InputGroup from "../FormElements/InputGroup";
 
 type LoginResponse = {
-  token: string;
   usuario: {
     id_usuario: number;
     usuario: string;
@@ -43,7 +42,8 @@ export default function SigninWithPassword() {
           senha: data.password,
         }),
       });
-      setStoredToken(response.token);
+      clearStoredToken();
+      window.sessionStorage.setItem("pepperone_profile", JSON.stringify(response.usuario));
       window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao fazer login");

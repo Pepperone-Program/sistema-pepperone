@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PublicoAlvoController } from '@controllers/PublicoAlvoController';
-import { authMiddleware } from '@middleware/auth';
+import { authMiddleware, authIfPresentMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
 import { publicoAlvoSchema, vincularProdutoSchema } from '@utils/validation';
 
@@ -19,6 +19,7 @@ router.post(
 
 router.get(
   '/',
+  authIfPresentMiddleware,
   PublicoAlvoController.list
 );
 

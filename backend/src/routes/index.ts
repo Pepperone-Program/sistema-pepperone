@@ -15,8 +15,13 @@ import contatoRoutes from './contato';
 import newsletterRoutes from './newsletter';
 import siteTokenRoutes from './site-token';
 import cacheRoutes from './cache';
+import dashboardRoutes from './dashboard';
+import landingPagesRoutes from './landing-pages';
 
 const router = Router();
+
+router.use('/api/v1/dashboard', dashboardRoutes);
+router.use('/api/v1/landing-pages', landingPagesRoutes);
 
 router.use('/api/v1/produtos', produtosRoutes);
 router.use('/api/v1/orcamentos', orcamentosRoutes);

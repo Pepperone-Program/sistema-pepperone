@@ -270,6 +270,6 @@ export class ProdutoService {
       throwError('PRODUTO_NOT_FOUND', 'Produto nÃ£o encontrado', 404);
     }
 
-    return ProdutoModel.findProductLinks(produtoId);
+    return ProdutoModel.findProductLinks(empresaId, produtoId);
   }
 }

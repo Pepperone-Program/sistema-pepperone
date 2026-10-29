@@ -3,6 +3,7 @@
 import { apiRequest } from "@/lib/api";
 import { FormEvent, useEffect, useState } from "react";
 import { StatusBadge } from "./status-badge";
+import { toast } from "@/components/ui/toast";
 
 type Contato = {
   id_cliente: number;
@@ -105,12 +106,11 @@ export function ClientContactsPage() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function load(cliente = selectedCliente) {
     if (!cliente) return;
     setError("");
-    setMessage("");
 
     try {
       const data = await apiRequest<{ items: Contato[] }>(
@@ -126,7 +126,8 @@ export function ClientContactsPage() {
   async function createContato(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCliente) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const payload = {
       contato_email: String(form.get("contato_email") || "").trim(),
       contato_nome: String(form.get("contato_nome") || "").trim(),
@@ -141,8 +142,9 @@ export function ClientContactsPage() {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      setMessage("Contato criado com sucesso.");
-      event.currentTarget.reset();
+      toast.add({ type: "success", description: "Contato criado com sucesso." });
+      formElement.reset();
+      setFormOpen(false);
       load(selectedCliente);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar contato");
@@ -156,7 +158,7 @@ export function ClientContactsPage() {
         `/api/v1/clientes/${selectedCliente.id_cliente}/contatos/${encodeURIComponent(email)}`,
         { method: "DELETE" },
       );
-      setMessage("Contato removido com sucesso.");
+      toast.add({ type: "success", description: "Contato removido com sucesso." });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao remover contato");
@@ -177,7 +179,7 @@ export function ClientContactsPage() {
         </p>
       </div>
 
-      {(message || error) && (
+      {error && (
         <div
           className={
             error
@@ -185,12 +187,14 @@ export function ClientContactsPage() {
               : "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700"
           }
         >
-          {error || message}
+          {error}
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <aside className="rounded-lg bg-white p-5 shadow-1 dark:bg-gray-dark">
+      <div>
+        {formOpen && <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" onMouseDown={() => setFormOpen(false)}>
+        <aside role="dialog" aria-modal="true" aria-label="Criar contato" onMouseDown={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-5 shadow-1 dark:bg-gray-dark">
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">Criar contato</h2><button type="button" className="rounded border px-3 py-1" onClick={() => setFormOpen(false)}>Fechar</button></div>
           <form onSubmit={createContato} className="space-y-4">
             <ClientSearch value={selectedCliente} onChange={setSelectedCliente} />
             <label className="block">
@@ -217,7 +221,7 @@ export function ClientContactsPage() {
               Criar contato
             </button>
           </form>
-        </aside>
+        </aside></div>}
 
         <section className="rounded-lg bg-white shadow-1 dark:bg-gray-dark">
           <div className="flex flex-col gap-3 border-b border-stroke p-4 dark:border-dark-3 sm:flex-row">
@@ -231,6 +235,7 @@ export function ClientContactsPage() {
             >
               Carregar contatos
             </button>
+            <button className="rounded-md bg-primary px-4 py-3 text-sm font-bold text-white" onClick={() => setFormOpen(true)} type="button">Criar contato</button>
           </div>
 
           <div className="overflow-x-auto">

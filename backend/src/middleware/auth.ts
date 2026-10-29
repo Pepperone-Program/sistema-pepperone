@@ -49,3 +49,17 @@ export const optionalAuthMiddleware = (
     next();
   }
 };
+
+// Public reads still work without a token, but an expired supplied session must
+// not silently fall back to the default company.
+export const authIfPresentMiddleware = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.headers.authorization) {
+    next();
+    return;
+  }
+  authMiddleware(req, res, next);
+};

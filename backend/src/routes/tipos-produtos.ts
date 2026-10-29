@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TipoProdutoController } from '@controllers/TipoProdutoController';
+import { authIfPresentMiddleware } from '@middleware/auth';
 
 const router = Router();
 
@@ -10,6 +11,7 @@ router.get(
 
 router.get(
   '/habilitados',
+  authIfPresentMiddleware,
   TipoProdutoController.listHabilitados
 );
 

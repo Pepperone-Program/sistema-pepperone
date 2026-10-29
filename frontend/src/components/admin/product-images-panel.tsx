@@ -54,7 +54,7 @@ export function ProductImagesPanel({
     [endpoint, produtoId],
   );
 
-  const loadImages = useCallback(async () => {
+  const loadImages = useCallback(async (throwOnError = false) => {
     setLoading(true);
     setError("");
 
@@ -72,6 +72,7 @@ export function ProductImagesPanel({
       setError(
         err instanceof Error ? err.message : "Falha ao carregar imagens",
       );
+      if (throwOnError) throw err;
     } finally {
       setLoading(false);
     }
@@ -204,7 +205,7 @@ export function ProductImagesPanel({
     }
 
     try {
-      await loadImages();
+      await loadImages(true);
       await onChanged?.();
       if (failedCount) {
         setError(
@@ -213,7 +214,7 @@ export function ProductImagesPanel({
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Falha ao atualizar as imagens",
+        `Nao foi possivel confirmar a lista apos a exclusao. Atualize antes de tentar novamente. ${err instanceof Error ? err.message : ""}`,
       );
     } finally {
       setSaving(false);
@@ -383,7 +384,7 @@ export function ProductImagesPanel({
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {loading ? (
           <div className="rounded-md border border-stroke px-4 py-6 text-center text-sm text-dark-4 dark:border-dark-3">
             Carregando imagens...
@@ -391,7 +392,7 @@ export function ProductImagesPanel({
         ) : images.length ? (
           images.map((image, index) => (
             <div
-              className={`grid grid-cols-[24px_32px_72px_1fr] gap-3 rounded-md border p-3 transition ${
+              className={`grid grid-cols-[24px_32px_1fr] gap-3 rounded-md border p-3 transition ${
                 selectedImageIds.has(image.id_imagem)
                   ? "border-primary bg-primary/5 dark:border-primary"
                   : "border-stroke dark:border-dark-3"
@@ -422,7 +423,7 @@ export function ProductImagesPanel({
                 =
               </button>
 
-              <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-md bg-gray-2 dark:bg-dark-2">
+              <div className="col-span-3 flex h-36 w-full items-center justify-center overflow-hidden rounded-md bg-gray-2 dark:bg-dark-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={image.filename}
@@ -431,14 +432,14 @@ export function ProductImagesPanel({
                 />
               </div>
 
-              <div className="min-w-0">
+              <div className="col-span-3 min-w-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-dark dark:text-white">
                       {image.filename}
                     </p>
                     <p className="text-xs text-dark-4 dark:text-dark-6">
-                      Ordem {index + 1}
+                      {index === 0 ? "Principal" : `Ordem ${index + 1}`}
                     </p>
                   </div>
                   <button

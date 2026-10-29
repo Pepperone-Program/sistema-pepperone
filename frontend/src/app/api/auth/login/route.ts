@@ -7,6 +7,7 @@ type LoginPayload = {
   success?: boolean;
   data?: {
     token?: string;
+    usuario?: { nome?: string; usuario?: string; email?: string };
   };
   message?: string;
 };
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest) {
   );
 
   const payload = (await response.json().catch(() => null)) as LoginPayload | null;
-  const nextResponse = NextResponse.json(payload, { status: response.status });
+  const safePayload = payload?.data ? { ...payload, data: { usuario: payload.data.usuario } } : payload;
+  const nextResponse = NextResponse.json(safePayload, { status: response.status });
   const token = payload?.data?.token;
 
   if (response.ok && payload?.success && token) {

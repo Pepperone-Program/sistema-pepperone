@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { CategoriaController } from '@controllers/CategoriaController';
-import { authMiddleware } from '@middleware/auth';
+import { authMiddleware, authIfPresentMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
 import { categoriaSchema, vincularProdutoSchema } from '@utils/validation';
 import multer from 'multer';
@@ -33,6 +33,7 @@ router.post(
 
 router.get(
   '/',
+  authIfPresentMiddleware,
   CategoriaController.list
 );
 
@@ -48,6 +49,7 @@ router.get(
 
 router.post(
   '/:id/capa',
+  authMiddleware,
   upload.single('image'),
   CategoriaController.uploadCapa
 );

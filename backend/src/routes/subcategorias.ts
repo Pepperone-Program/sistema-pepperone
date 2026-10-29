@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { SubcategoriaController } from '@controllers/CategoriaController';
-import { authMiddleware } from '@middleware/auth';
+import { authMiddleware, authIfPresentMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
 import { editarProdutosSubcategoriaLoteSchema, subcategoriaSchema, vincularProdutoSchema } from '@utils/validation';
 
@@ -19,6 +19,7 @@ router.post(
 
 router.get(
   '/',
+  authIfPresentMiddleware,
   SubcategoriaController.list
 );
 

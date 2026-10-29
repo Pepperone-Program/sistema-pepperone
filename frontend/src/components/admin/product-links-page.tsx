@@ -1,5 +1,7 @@
 "use client";
 
+import { FeedbackToast } from "@/components/ui/toast";
+
 import { apiRequest } from "@/lib/api";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -215,7 +217,8 @@ export function ProductLinksPage() {
         </p>
       </div>
 
-      {(message || error) && (
+      <FeedbackToast message={message} type="success" />
+      {error && (
         <div
           className={
             error
@@ -223,7 +226,7 @@ export function ProductLinksPage() {
               : "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700"
           }
         >
-          {error || message}
+          {error}
         </div>
       )}
 

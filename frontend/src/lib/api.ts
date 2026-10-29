@@ -61,13 +61,9 @@ function buildUrl(path: string, query?: RequestOptions["query"]) {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
-  const token = getStoredToken();
   const headers = new Headers(options.headers);
 
   headers.set("Content-Type", "application/json");
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
 
   const response = await fetch(buildUrl(path, options.query), {
     ...options,
@@ -90,12 +86,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
 }
 
 export async function apiFormRequest<T>(path: string, formData: FormData) {
-  const token = getStoredToken();
   const headers = new Headers();
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+
 
   const response = await fetch(buildUrl(path), {
     method: "POST",

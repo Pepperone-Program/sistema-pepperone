@@ -8,10 +8,11 @@ import {
   updateResource,
   type PaginatedData,
 } from "@/lib/api";
-import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CategoryProductsModal } from "./category-products-modal";
 import { StatusBadge } from "./status-badge";
+import { toast } from "@/components/ui/toast";
 
 type Category = Record<string, unknown> & {
   id_categoria?: number;
@@ -47,8 +48,9 @@ function CategoryModal({
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState(String(category?.url_capa || ""));
   const [selectedCover, setSelectedCover] = useState<File | null>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
   const values = useMemo(() => ({ ...defaultCategory, ...(category || {}) }), [category]);
-  const categoryId = category?.id_categoria ? Number(category.id_categoria) : null;
+  const [categoryId, setCategoryId] = useState<number | null>(category?.id_categoria ? Number(category.id_categoria) : null);
 
   useEffect(() => setMounted(true), []);
 
@@ -85,12 +87,20 @@ function CategoryModal({
       }
 
       const savedCategoryId = categoryId || Number(savedCategory.id_categoria);
+      if (!savedCategoryId) throw new Error("Categoria salva, mas o identificador não foi retornado. Atualize a lista antes de tentar novamente.");
+      setCategoryId(savedCategoryId);
 
       if (selectedCover && savedCategoryId) {
-        await uploadCover(selectedCover, savedCategoryId, false, true);
+        try {
+          await uploadCover(selectedCover, savedCategoryId, false, true);
+        } catch (uploadError) {
+          await onSaved();
+          throw new Error(`Categoria salva. Falha ao enviar a capa: ${uploadError instanceof Error ? uploadError.message : "erro desconhecido"}. Tente salvar novamente.`);
+        }
       }
 
       await onSaved();
+      toast.add({ type: "success", description: "Categoria salva com sucesso." });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar categoria");
@@ -137,7 +147,7 @@ function CategoryModal({
     event.preventDefault();
     setDragActive(false);
     const file = Array.from(event.dataTransfer.files || []).find((item) => item.type.startsWith("image/"));
-    if (file) uploadCover(file);
+    if (file) { setSelectedCover(file); setError(""); }
   }
 
   const modal = (
@@ -162,6 +172,11 @@ function CategoryModal({
               setDragActive(true);
             }}
             onDrop={handleDrop}
+            role="button"
+            tabIndex={0}
+            aria-label="Selecionar ou arrastar imagem de capa"
+            onClick={(event) => { if (!(event.target as HTMLElement).closest("label")) coverInput.current?.click(); }}
+            onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); coverInput.current?.click(); } }}
           >
             <div className="overflow-hidden rounded-md border border-stroke bg-gray-2 dark:border-dark-3 dark:bg-dark-2">
               {previewUrl ? (
@@ -174,18 +189,19 @@ function CategoryModal({
               )}
             </div>
             <p className="mt-3 text-xs text-dark-4 dark:text-dark-6">
-              Arraste uma imagem aqui para atualizar a capa.
-              {!categoryId && selectedCover ? " Ela sera enviada ao salvar." : ""}
+              Arraste uma imagem ou clique em selecionar. Ela ser? enviada ao salvar.
+              {selectedCover && <span className="block font-semibold">{selectedCover.name}</span>}
             </p>
             <label className="mt-3 inline-flex cursor-pointer rounded-md bg-primary px-3 py-2 text-xs font-bold text-white">
               {uploading ? "Enviando..." : selectedCover ? "Imagem selecionada" : "Selecionar imagem"}
               <input
+                ref={coverInput}
                 accept="image/*"
                 className="hidden"
                 disabled={uploading || saving}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (file) uploadCover(file);
+                  if (file) { setSelectedCover(file); setError(""); }
                 }}
                 type="file"
               />
@@ -286,6 +302,7 @@ export function CategoriesPage() {
     if (!confirmed) return;
     await deleteResource("/api/v1/categorias", String(category.id_categoria));
     await loadData();
+    toast.add({ type: "success", description: "Categoria excluída." });
   }
 
   return (

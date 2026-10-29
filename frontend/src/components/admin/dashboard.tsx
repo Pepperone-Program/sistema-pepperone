@@ -1,29 +1,22 @@
 "use client";
 
-import { apiRequest, listResource, type PaginatedData } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 import type { EstatisticasResumo, ProdutoRanking } from "@/types/admin";
 import type { ApexOptions } from "apexcharts";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { DashboardCharts } from "./dashboard-charts";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-type AnyRow = Record<string, unknown>;
-
 type DashboardState = {
   estatisticas: EstatisticasResumo | null;
-  produtos: PaginatedData<AnyRow> | null;
-  clientes: PaginatedData<AnyRow> | null;
-  orcamentos: PaginatedData<AnyRow> | null;
-  categorias: PaginatedData<AnyRow> | null;
+  indicadores: { produtos: number; banners_ativos: number; orcamentos: number; categorias: number } | null;
 };
 
 const initialState: DashboardState = {
   estatisticas: null,
-  produtos: null,
-  clientes: null,
-  orcamentos: null,
-  categorias: null,
+  indicadores: null,
 };
 
 const formatDateInput = (date: Date): string => {
@@ -177,18 +170,15 @@ export function AdminDashboard() {
     setError("");
 
     try {
-      const [estatisticas, produtos, clientes, orcamentos, categorias] =
+      const [estatisticas, dashboard] =
         await Promise.all([
           apiRequest<EstatisticasResumo>("/api/v1/estatisticas-produtos/resumo", {
             query: { limit: 8 },
           }),
-          listResource<AnyRow>("/api/v1/produtos", { limit: 1 }),
-          listResource<AnyRow>("/api/v1/clientes", { limit: 1 }),
-          listResource<AnyRow>("/api/v1/orcamentos", { limit: 1 }),
-          listResource<AnyRow>("/api/v1/categorias", { limit: 1 }),
+          apiRequest<{ indicadores: NonNullable<DashboardState["indicadores"]> }>("/api/v1/dashboard"),
         ]);
 
-      setState({ estatisticas, produtos, clientes, orcamentos, categorias });
+      setState({ estatisticas, indicadores: dashboard.indicadores });
       await loadCustomRanking(defaultStartDate, defaultEndDate);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar dashboard");
@@ -229,24 +219,26 @@ export function AdminDashboard() {
         <StatCard
           detail="Catalogo cadastrado"
           label="Produtos"
-          value={loading ? "..." : state.produtos?.total || 0}
+          value={loading ? "..." : state.indicadores?.produtos ?? 0}
         />
         <StatCard
-          detail="Base comercial"
-          label="Clientes"
-          value={loading ? "..." : state.clientes?.total || 0}
+          detail="Disponíveis no site"
+          label="Banners ativos"
+          value={loading ? "..." : state.indicadores?.banners_ativos ?? 0}
         />
         <StatCard
           detail="Propostas registradas"
           label="Orçamentos"
-          value={loading ? "..." : state.orcamentos?.total || 0}
+          value={loading ? "..." : state.indicadores?.orcamentos ?? 0}
         />
         <StatCard
           detail="Organizacao do catalogo"
           label="Categorias"
-          value={loading ? "..." : state.categorias?.total || 0}
+          value={loading ? "..." : state.indicadores?.categorias ?? 0}
         />
       </div>
+
+      <DashboardCharts />
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
         <div className="rounded-lg bg-white p-5 shadow-1 dark:bg-gray-dark">

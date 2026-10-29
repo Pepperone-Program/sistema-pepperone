@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ProdutoController } from '@controllers/ProdutoController';
-import { authMiddleware } from '@middleware/auth';
+import { authMiddleware, authIfPresentMiddleware } from '@middleware/auth';
 import { validationMiddleware } from '@middleware/validation';
 import { productSchema } from '@utils/validation';
 import multer from 'multer';
@@ -24,17 +24,20 @@ const upload = multer({
 
 router.post(
   '/',
+  authIfPresentMiddleware,
   validationMiddleware(productSchema),
   ProdutoController.create
 );
 
 router.get(
   '/:id/images',
+  authIfPresentMiddleware,
   ProdutoController.listImages
 );
 
 router.get(
   '/:id/links',
+  authIfPresentMiddleware,
   ProdutoController.listLinks
 );
 
@@ -82,11 +85,13 @@ router.post('/search/events', SearchController.recordInteraction);
 
 router.get(
   '/:id',
+  authIfPresentMiddleware,
   ProdutoController.getById
 );
 
 router.get(
   '/',
+  authIfPresentMiddleware,
   ProdutoController.list
 );
 
