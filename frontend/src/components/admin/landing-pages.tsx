@@ -15,6 +15,7 @@ const config: ResourceConfig = {
     { name: "id_landing_page", label: "ID" },
     { name: "titulo", label: "Título" },
     { name: "url", label: "URL" },
+    { name: "descricao", label: "Descrição" },
     { name: "habilitado", label: "Status" },
   ],
   formFields: [

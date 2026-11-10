@@ -61,6 +61,18 @@ describe('dashboard', () => {
 });
 
 describe('landing pages', () => {
+  it('lists only the authenticated company rows with the expected fields', async () => {
+    const landing = { id_landing_page: 3, titulo: 'Campanha', url: 'https://example.com', descricao: 'Detalhes', habilitado: 'S' };
+    vi.mocked(query).mockResolvedValueOnce([{ total: 1 }] as any).mockResolvedValueOnce([landing] as any);
+    const res = response();
+    await handler(landingPages, '/', 'get')({ user: { id_empresa: 7 }, query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(vi.mocked(query).mock.calls[0][1]).toEqual([7, '%%', '%%']);
+    expect(vi.mocked(query).mock.calls[1][0]).toContain('id_landing_page, titulo, url, descricao, habilitado');
+    expect(vi.mocked(query).mock.calls[1][1]).toEqual([7, '%%', '%%', 10, 0]);
+    expect(res.body.data.items).toEqual([landing]);
+  });
+
   it('rejects unsafe URLs before writing', async () => {
     const res = response();
     await handler(landingPages, '/', 'post')({ user: { id_empresa: 7 }, body: { titulo: 'Teste', url: 'javascript:alert(1)' } }, res);
