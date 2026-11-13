@@ -61,6 +61,20 @@ describe('dashboard', () => {
 });
 
 describe('landing pages', () => {
+  it('allows public listing of enabled pages from the default company', async () => {
+    const route = (landingPages as any).stack.find((layer: any) => layer.route?.path === '/' && layer.route.methods.get).route;
+    expect(route.stack[0].handle).toBe(authIfPresentMiddleware);
+    const next = vi.fn();
+    route.stack[0].handle({ headers: {} }, response(), next);
+    expect(next).toHaveBeenCalledOnce();
+    vi.mocked(query).mockResolvedValueOnce([{ total: 0 }] as any).mockResolvedValueOnce([] as any);
+    const res = response();
+    await handler(landingPages, '/', 'get')({ query: { habilitado: 'N' } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(vi.mocked(query).mock.calls[0][0]).toContain('AND habilitado = ?');
+    expect(vi.mocked(query).mock.calls[0][1]).toEqual([1, '%%', '%%', 'S']);
+  });
+
   it('lists only the authenticated company rows with the expected fields', async () => {
     const landing = { id_landing_page: 3, titulo: 'Campanha', url: 'https://example.com', descricao: 'Detalhes', habilitado: 'S' };
     vi.mocked(query).mockResolvedValueOnce([{ total: 1 }] as any).mockResolvedValueOnce([landing] as any);
@@ -78,6 +92,14 @@ describe('landing pages', () => {
     await handler(landingPages, '/', 'post')({ user: { id_empresa: 7 }, body: { titulo: 'Teste', url: 'javascript:alert(1)' } }, res);
     expect(res.statusCode).toBe(400);
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it('keeps mutations authenticated', () => {
+    for (const method of ['post', 'put', 'delete']) {
+      const path = method === 'post' ? '/' : '/:id';
+      const route = (landingPages as any).stack.find((layer: any) => layer.route?.path === path && layer.route.methods[method]).route;
+      expect(route.stack[0].handle).toBe(authMiddleware);
+    }
   });
 
   it('restricts edits to the authenticated company', async () => {

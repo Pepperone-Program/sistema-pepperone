@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { query } from '@database/connection';
-import { authMiddleware, AuthenticatedRequest } from '@middleware/auth';
+import { authIfPresentMiddleware, authMiddleware, AuthenticatedRequest } from '@middleware/auth';
 import { errorResponse, paginatedResponse, successResponse } from '@utils/response';
 
 const router = Router();
-router.use(authMiddleware);
 
 function values(body: Record<string, unknown>) {
   const titulo = String(body.titulo || '').trim();
@@ -19,14 +18,17 @@ function values(body: Record<string, unknown>) {
   return { titulo, url, descricao, habilitado };
 }
 
-router.get('/', async (req: AuthenticatedRequest, res) => {
+router.get('/', authIfPresentMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit || '10'), 10) || 10));
     const search = `%${String(req.query.search || '').trim()}%`;
-    const args: Array<string | number> = [req.user!.id_empresa, search, search];
+    const args: Array<string | number> = [req.user?.id_empresa || 1, search, search];
     let where = 'WHERE id_empresa = ? AND (titulo LIKE ? OR url LIKE ?)';
-    if (req.query.habilitado === 'S' || req.query.habilitado === 'N') {
+    if (!req.user) {
+      where += ' AND habilitado = ?';
+      args.push('S');
+    } else if (req.query.habilitado === 'S' || req.query.habilitado === 'N') {
       where += ' AND habilitado = ?';
       args.push(req.query.habilitado);
     }
@@ -36,7 +38,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
   } catch (error) { errorResponse(res, 'LANDING_LIST_ERROR', (error as Error).message, 500); }
 });
 
-router.post('/', async (req: AuthenticatedRequest, res) => {
+router.post('/', authMiddleware, async (req: AuthenticatedRequest, res) => {
   const data = values(req.body);
   if (!data) { errorResponse(res, 'INVALID_LANDING', 'Informe um título e uma URL HTTP ou HTTPS válida.', 400); return; }
   try {
@@ -45,7 +47,7 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
   } catch (error) { errorResponse(res, 'LANDING_CREATE_ERROR', (error as Error).message, 500); }
 });
 
-router.put('/:id', async (req: AuthenticatedRequest, res) => {
+router.put('/:id', authMiddleware, async (req: AuthenticatedRequest, res) => {
   const data = values(req.body);
   const id = Number(req.params.id);
   if (!data || !Number.isSafeInteger(id) || id < 1) { errorResponse(res, 'INVALID_LANDING', 'Informe dados válidos.', 400); return; }
@@ -56,7 +58,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res) => {
   } catch (error) { errorResponse(res, 'LANDING_UPDATE_ERROR', (error as Error).message, 500); }
 });
 
-router.delete('/:id', async (req: AuthenticatedRequest, res) => {
+router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id < 1) { errorResponse(res, 'INVALID_ID', 'Identificador inválido.', 400); return; }
   try {
