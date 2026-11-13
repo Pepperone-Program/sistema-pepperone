@@ -5,9 +5,11 @@ import { getConnection, query } from './connection';
 const migrationsDirectory = path.resolve(__dirname, '../../migrations');
 const splitStatements = (sql: string): string[] => sql.split(/;\s*(?:\r?\n|$)/).map((item) => item.trim()).filter(Boolean);
 
-export async function migrate(): Promise<void> {
+export async function migrate(onlyVersions?: readonly string[]): Promise<void> {
   await query(`CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(100) NOT NULL PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB`);
-  const files = (await fs.readdir(migrationsDirectory)).filter((file) => file.endsWith('.up.sql')).sort();
+  const files = (await fs.readdir(migrationsDirectory))
+    .filter((file) => file.endsWith('.up.sql') && (!onlyVersions || onlyVersions.includes(file.replace('.up.sql', ''))))
+    .sort();
   const applied = await query('SELECT version FROM schema_migrations') as Array<{ version: string }>;
   const versions = new Set(applied.map((row) => row.version));
   for (const file of files) {
