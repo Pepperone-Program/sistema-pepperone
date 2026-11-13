@@ -1,6 +1,6 @@
 import { getConnection, query } from '@database/connection';
 import { CategoriaModel } from '@models/Categoria';
-import { ProdutoModel } from '@models/Produto';
+import { associationProductsList } from './associationProductsList';
 import { adminProductExclusion, adminProductSearch } from '@models/adminProductSearch';
 import { throwError } from '@utils/helpers';
 
@@ -20,12 +20,7 @@ export class CategoryProductsService {
       if (rows.length > CATEGORY_SELECTION_LIMIT) throwError('SELECTION_TOO_LARGE', 'Refine o filtro para selecionar ate 50000 produtos', 422);
       return { produto_ids: rows.map((row) => Number(row.id_produto)) };
     }
-    const limit = 30;
-    const [products, links] = await Promise.all([
-      ProdutoModel.findAll(empresaId, page, limit, search, undefined, undefined, undefined, undefined, undefined, 'DESC', exclude),
-      query('SELECT id_produto FROM aux_categorias_produtos WHERE id_empresa = ? AND id_categoria = ?', [empresaId, categoriaId]) as Promise<Array<{ id_produto: number }>>,
-    ]);
-    return { ...products, page, limit, totalPages: Math.ceil(products.total / limit), linked_ids: links.map((row) => Number(row.id_produto)) };
+    return associationProductsList(empresaId, categoriaId, 'category', search, exclude, page, 30);
   }
 
   static async assign(empresaId: number, categoriaId: number, requestedIds: number[] = [], requestedRemovalIds: number[] = []) {

@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/database/connection', () => ({ getConnection: vi.fn(), query: vi.fn() }));
 vi.mock('../src/models/Categoria', () => ({ SubcategoriaModel: { findById: vi.fn() } }));
-vi.mock('../src/models/Produto', () => ({ ProdutoModel: { findAll: vi.fn() } }));
 
 import { getConnection, query } from '../src/database/connection';
 import { SubcategoriaModel } from '../src/models/Categoria';
@@ -102,6 +101,21 @@ describe('transactional subcategory assignment', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductSearch('caderno').sql), [7, '%caderno%', '%caderno%', '%caneta%', '%ecologica%', 50001]);
     expect(query).toHaveBeenCalledWith(expect.stringContaining(adminProductExclusion('caneta, ecologica').sql), expect.any(Array));
     expect(adminProductSearch('100%_').values).toEqual(['%100!%!_%', '%100!%!_%']);
+  });
+
+  it('puts linked subcategory products before pagination', async () => {
+    vi.mocked(query).mockImplementation(async (sql: string) => {
+      if (sql.startsWith('SELECT COUNT')) return [{ total: 31 }];
+      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 3, produto: 'Caderno', codigo: 'C3' }];
+      return [{ id_produto: 3 }];
+    });
+    const result = await SubcategoryProductsService.available(7, 9, '', '', 1, false);
+    expect(result.linked_ids).toEqual([3]);
+    expect(result.items[0].id_produto).toBe(3);
+    const [sql, values] = vi.mocked(query).mock.calls.find(([statement]) => statement.startsWith('SELECT id_produto, produto'))!;
+    expect(sql).toContain('ORDER BY EXISTS (SELECT 1 FROM aux_subcategorias_produtos link');
+    expect(sql).toContain('link.id_subcategoria = ?) DESC, data_inclusao DESC');
+    expect(values).toEqual([7, 9, 30, 0]);
   });
 
   it('rejects too many exclusion terms before querying products', async () => {

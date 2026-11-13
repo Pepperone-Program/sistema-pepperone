@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/database/connection', () => ({ getConnection: vi.fn(), query: vi.fn() }));
 vi.mock('../src/models/Categoria', () => ({ CategoriaModel: { findById: vi.fn() } }));
-vi.mock('../src/models/Produto', () => ({ ProdutoModel: { findAll: vi.fn() } }));
 import { getConnection, query } from '../src/database/connection';
 import { CategoriaModel } from '../src/models/Categoria';
-import { ProdutoModel } from '../src/models/Produto';
 import { CategoryProductsService } from '../src/services/CategoryProductsService';
 import { adminProductExclusion, adminProductSearch } from '../src/models/adminProductSearch';
 
@@ -128,12 +126,21 @@ describe('transactional category assignment', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('uses the exclusion filter in the paginated listing', async () => {
-    vi.mocked(ProdutoModel.findAll).mockResolvedValue({ items: [], total: 0 });
-    vi.mocked(query).mockResolvedValue([]);
-    await CategoryProductsService.available(7, 8, 'bloco', 'caneta', 2, false);
-    expect(ProdutoModel.findAll).toHaveBeenCalledWith(
-      7, 2, 30, 'bloco', undefined, undefined, undefined, undefined, undefined, 'DESC', 'caneta'
-    );
+  it('puts linked products before pagination and returns their checked IDs', async () => {
+    vi.mocked(query).mockImplementation(async (sql: string) => {
+      if (sql.startsWith('SELECT COUNT')) return [{ total: 31 }];
+      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 4, produto: 'Bloco', codigo: 'B4' }];
+      return [{ id_produto: 4 }];
+    });
+    const result = await CategoryProductsService.available(7, 8, 'bloco', 'caneta', 1, false);
+    expect(result.linked_ids).toEqual([4]);
+    expect(result.items[0].id_produto).toBe(4);
+    expect(result.totalPages).toBe(2);
+    const [sql, values] = vi.mocked(query).mock.calls.find(([statement]) => statement.startsWith('SELECT id_produto, produto'))!;
+    expect(sql).toContain('ORDER BY EXISTS (SELECT 1 FROM aux_categorias_produtos link');
+    expect(sql).toContain('link.id_empresa = produtos.id_empresa AND link.id_produto = produtos.id_produto');
+    expect(sql).toContain('link.id_categoria = ?) DESC, data_inclusao DESC');
+    expect(sql).toContain(adminProductExclusion('caneta').sql);
+    expect(values).toEqual([7, '%bloco%', '%bloco%', '%caneta%', 8, 30, 0]);
   });
 });
