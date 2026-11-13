@@ -16,5 +16,6 @@ WORKDIR /backend
 COPY --from=build /backend/package.json ./package.json
 COPY --from=build /backend/node_modules ./node_modules
 COPY --from=build /backend/dist ./dist
+COPY --from=build /backend/migrations ./migrations
 EXPOSE 3001
 CMD ["npm", "run", "start"]
