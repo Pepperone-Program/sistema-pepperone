@@ -17,6 +17,7 @@
     "products:descriptions:update": "tsx src/scripts/updateProductDescriptionsFromJson.ts",
     "db:migrate": "tsx src/scripts/runMigrations.ts up",
     "db:rollback": "tsx src/scripts/runMigrations.ts down",
+    "cache:cleanup-legacy": "tsx src/scripts/cleanupLegacyCache.ts",
     "seo:categories:generate": "tsx src/scripts/verifyCategorySeoContent.ts --write",
     "seo:categories:verify": "tsx src/scripts/verifyCategorySeoContent.ts",
     "search:preflight": "tsx src/scripts/searchPreflight.ts",

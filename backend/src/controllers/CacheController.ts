@@ -10,6 +10,9 @@ const allowedNamespaces = new Set([
   'datas-promocionais',
   'publicos-alvos',
   'produtos',
+  'subcategorias',
+  'search',
+  'search-v2',
 ]);
 
 const normalizeNamespace = (namespace: string): string => namespace.trim().toLowerCase();
@@ -49,11 +52,11 @@ export class CacheController {
         return;
       }
 
-      await Promise.all(namespaces.map((namespace) => CacheService.invalidateNamespace(namespace)));
+      await CacheService.invalidateNamespaces(namespaces);
 
       successResponse(res, {
         invalidated: namespaces,
-        prefix: 'site-pep',
+        prefix: 'site-pep:v2',
       }, 'Cache invalidado com sucesso');
     } catch (error) {
       const err = error as any;
@@ -64,11 +67,11 @@ export class CacheController {
   static async invalidateAll(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const namespaces = Array.from(allowedNamespaces);
-      await Promise.all(namespaces.map((namespace) => CacheService.invalidateNamespace(namespace)));
+      await CacheService.invalidateNamespaces(namespaces);
 
       successResponse(res, {
         invalidated: namespaces,
-        prefix: 'site-pep',
+        prefix: 'site-pep:v2',
       }, 'Todos os caches conhecidos foram invalidados com sucesso');
     } catch (error) {
       const err = error as any;

@@ -3,7 +3,8 @@ type RedisCommandResponse<T = unknown> = {
   error?: string;
 };
 
-const CACHE_PREFIX = 'site-pep';
+const CACHE_PREFIX = 'site-pep:v2';
+const CATALOG_TTL_SECONDS = 30;
 const productRelatedNamespaces = new Set([
   'categorias',
   'tipos-produtos',
@@ -49,24 +50,55 @@ export class CacheService {
       return { value: await loader(), cacheStatus: 'disabled' };
     }
 
-    const cached = await this.get<T>(key);
-    if (cached.found) {
-      return { value: cached.value as T, cacheStatus: 'hit' };
+    const started = performance.now();
+    let redisMs = 0;
+    const namespace = key.startsWith(`${CACHE_PREFIX}:`) ? key.slice(CACHE_PREFIX.length + 1).split(':')[0] : null;
+    if (!namespace) return { value: await loader(), cacheStatus: 'disabled' };
+    let version: string;
+    try {
+      version = (await this.command<string | null>(['GET', `${CACHE_PREFIX}:generation:${namespace}`])).result || '0';
+      const cached = await this.command<string | null>(['GET', `${key}:g${version}`]);
+      if (cached.result !== null && cached.result !== undefined) {
+        this.logTiming(namespace, 'hit', performance.now() - started, 0, performance.now() - started);
+        return { value: JSON.parse(cached.result) as T, cacheStatus: 'hit' };
+      }
+      redisMs = performance.now() - started;
+    } catch (error) {
+      console.warn('[CacheService] read failed', { namespace, message: error instanceof Error ? error.message : String(error) });
+      redisMs = performance.now() - started;
+      const value = await loader();
+      this.logTiming(namespace, 'bypass', redisMs, performance.now() - started - redisMs, performance.now() - started);
+      return { value, cacheStatus: 'disabled' };
     }
 
     const value = await loader();
-    await this.set(key, value, ttlSeconds);
+    const databaseMs = performance.now() - started - redisMs;
+    try {
+      const current = (await this.command<string | null>(['GET', `${CACHE_PREFIX}:generation:${namespace}`])).result || '0';
+      if (current === version) {
+        const ttl = namespace === 'orcamentos'
+          ? Math.max(ttlSeconds || CATALOG_TTL_SECONDS, 1)
+          : Math.min(Math.max(ttlSeconds || CATALOG_TTL_SECONDS, 1), CATALOG_TTL_SECONDS);
+        await this.command<string>(['SET', `${key}:g${version}`, JSON.stringify(value), 'EX', String(ttl)]);
+      }
+    } catch (error) {
+      console.warn('[CacheService] set failed', { namespace, message: error instanceof Error ? error.message : String(error) });
+    }
+    this.logTiming(namespace, 'miss', performance.now() - started - databaseMs, databaseMs, performance.now() - started);
     return { value, cacheStatus: 'miss' };
   }
 
-  static async invalidateNamespace(namespace: string): Promise<void> {
-    if (!isEnabled()) return;
-
-    await this.invalidateNamespaceOnly(namespace);
-
-    if (productRelatedNamespaces.has(namespace)) {
-      await this.invalidateNamespaceOnly('produtos');
+  private static logTiming(namespace: string, status: string, redisMs: number, databaseMs: number, totalMs: number): void {
+    if (process.env.CACHE_TIMING_LOGS === 'true') {
+      console.info('[CacheService] timing', {
+        namespace, status,
+        redisMs: Math.round(redisMs), databaseMs: Math.round(databaseMs), totalMs: Math.round(totalMs),
+      });
     }
+  }
+
+  static async invalidateNamespace(namespace: string): Promise<void> {
+    await this.invalidateNamespaces([namespace]);
   }
 
   static async invalidateNamespaces(namespaces: string[]): Promise<void> {
@@ -79,75 +111,18 @@ export class CacheService {
       if (productRelatedNamespaces.has(namespace)) {
         expandedNamespaces.add('produtos');
       }
-    }
-
-    await Promise.all(
-      Array.from(expandedNamespaces).map((namespace) =>
-        this.invalidateNamespaceOnly(namespace)
-      )
-    );
-  }
-
-  private static async invalidateNamespaceOnly(namespace: string): Promise<void> {
-    if (!isEnabled()) return;
-
-    const pattern = `${CACHE_PREFIX}:${normalizePart(namespace)}:*`;
-
-    try {
-      const keys: string[] = [];
-      let cursor = '0';
-
-      do {
-        const response = await this.command<[string, string[]]>([
-          'SCAN',
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          '100',
-        ]);
-        const result = response.result;
-        cursor = result?.[0] || '0';
-        keys.push(...(result?.[1] || []));
-      } while (cursor !== '0');
-
-      if (keys.length === 0) return;
-      await this.command<number>(['DEL', ...keys]);
-    } catch (error) {
-      console.warn('[CacheService] invalidate failed', {
-        namespace,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  private static async get<T>(key: string): Promise<{ found: boolean; value?: T }> {
-    try {
-      const response = await this.command<string | null>(['GET', key]);
-      if (!response.result) {
-        return { found: false };
+      if (namespace === 'categorias' || namespace === 'subcategorias') {
+        expandedNamespaces.add('tipos-produtos');
       }
-
-      return { found: true, value: JSON.parse(response.result) as T };
-    } catch (error) {
-      console.warn('[CacheService] get failed', {
-        key,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return { found: false };
     }
-  }
 
-  private static async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
-    try {
-      const command = ttlSeconds
-        ? ['SET', key, JSON.stringify(value), 'EX', String(ttlSeconds)]
-        : ['SET', key, JSON.stringify(value)];
-      await this.command<string>(command);
-    } catch (error) {
-      console.warn('[CacheService] set failed', {
-        key,
-        message: error instanceof Error ? error.message : String(error),
+    const outcomes = await Promise.allSettled(Array.from(expandedNamespaces).map((namespace) =>
+      this.command<number>(['INCR', `${CACHE_PREFIX}:generation:${normalizePart(namespace)}`])));
+    const failure = outcomes.find((outcome) => outcome.status === 'rejected');
+    if (failure?.status === 'rejected') {
+      console.warn('[CacheService] invalidate failed', { namespaces: [...expandedNamespaces], message: String(failure.reason) });
+      throw Object.assign(new Error('Dados salvos, mas a atualizacao do cache falhou. Consulte antes de repetir a operacao.'), {
+        code: 'CACHE_INVALIDATION_FAILED', statusCode: 503,
       });
     }
   }

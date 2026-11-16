@@ -12,9 +12,9 @@ describe('optional Redis cache', () => {
       signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
     })));
     const loader = vi.fn().mockResolvedValue({ items: [{ id_produto: 1 }] });
-    expect(await CacheService.getOrSet('test', loader)).toEqual({ items: [{ id_produto: 1 }] });
+    expect(await CacheService.getOrSet(CacheService.buildKey('produtos', 'test'), loader)).toEqual({ items: [{ id_produto: 1 }] });
     expect(loader).toHaveBeenCalledOnce();
-    expect(signals).toHaveLength(2);
+    expect(signals).toHaveLength(1);
     expect(signals.every((signal) => signal.aborted)).toBe(true);
   });
 });
