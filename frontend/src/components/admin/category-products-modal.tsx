@@ -6,7 +6,7 @@ import { apiRequest, type PaginatedData } from "@/lib/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Product = { id_produto: number; produto: string; codigo: string };
+type Product = { id_produto: number; produto: string; codigo: string; site: string };
 type Page = PaginatedData<Product> & { linked_ids: number[] };
 
 export function CategoryProductsModal({
@@ -36,12 +36,15 @@ export function CategoryProductsModal({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
+  const waitingFilter = search.trim() !== filter || exclude.trim() !== excludeFilter;
   const selectController = useRef<AbortController | null>(null);
   const initialLinked = useRef<Set<number>>(new Set());
   const initializedLinks = useRef(false);
   const savingRef = useRef(false);
   const selectingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
     if (!savingRef.current) onClose();
   }, [onClose]);
@@ -77,13 +80,19 @@ export function CategoryProductsModal({
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    if (page === 1) {
+      setData(null);
+      scrollRef.current?.scrollTo({ top: 0 });
+    }
     apiRequest<Page>(`${endpoint}/disponiveis`, {
       query: { search: filter, exclude: excludeFilter, page },
       signal: controller.signal,
     })
       .then((response) => {
         if (!controller.signal.aborted) {
-          setData(response);
+          setData((current) => page === 1 || !current
+            ? response
+            : { ...response, items: [...current.items, ...response.items] });
           if (!initializedLinks.current) {
             const linkedProducts = new Set(response.linked_ids);
             initialLinked.current = linkedProducts;
@@ -94,7 +103,6 @@ export function CategoryProductsModal({
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
-          setData(null);
           setError(
             err instanceof Error ? err.message : "Falha ao carregar produtos",
           );
@@ -105,6 +113,20 @@ export function CategoryProductsModal({
       });
     return () => controller.abort();
   }, [endpoint, entityLabel, filter, excludeFilter, page, revision]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    const root = scrollRef.current;
+    if (!target || !root || loading || saving || selecting || waitingFilter || error || !data || page >= data.totalPages) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        observer.disconnect();
+        setPage((current) => current + 1);
+      }
+    }, { root, rootMargin: "200px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [data, error, loading, page, saving, selecting, waitingFilter]);
 
   async function selectAll() {
     if (selectingRef.current || savingRef.current) return;
@@ -198,6 +220,7 @@ export function CategoryProductsModal({
       initialLinked.current = new Set();
       initializedLinks.current = false;
       setData(null);
+      setPage(1);
       setRevision((value) => value + 1);
     } catch (err) {
       setError(
@@ -214,7 +237,6 @@ export function CategoryProductsModal({
   const addedCount = [...selected].filter((id) => !initialLinked.current.has(id)).length;
   const removedCount = [...initialLinked.current].filter((id) => !selected.has(id)).length;
   const hasChanges = addedCount > 0 || removedCount > 0;
-  const waitingFilter = search.trim() !== filter || exclude.trim() !== excludeFilter;
   const buttonClass =
     "rounded-md border border-stroke px-3 py-2 text-sm font-semibold disabled:opacity-40 dark:border-dark-3";
 
@@ -329,7 +351,7 @@ export function CategoryProductsModal({
             </span>
           </div>
         </header>
-        <main className="min-h-0 overflow-y-auto p-5">
+        <main ref={scrollRef} className="min-h-0 overflow-y-auto p-5">
           {error && (
             <p
               role="alert"
@@ -339,10 +361,15 @@ export function CategoryProductsModal({
             </p>
           )}
           <FeedbackToast message={message} type="success" />
-          {loading || waitingFilter ? (
+          {(loading && !data) || waitingFilter ? (
             <p className="py-10 text-center">Carregando produtos...</p>
           ) : (
             <div className="divide-y divide-stroke rounded-md border border-stroke dark:divide-dark-3 dark:border-dark-3">
+              <div className="flex items-center gap-3 bg-gray-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-dark-4 dark:bg-dark-2">
+                <span className="size-5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1">Produto e vínculo</span>
+                <span className="w-20 shrink-0 text-right">Status</span>
+              </div>
               {data?.items.map((product) => (
                 <label
                   key={product.id_produto}
@@ -364,7 +391,7 @@ export function CategoryProductsModal({
                       })
                     }
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="break-words font-semibold text-dark dark:text-white">
                       {product.produto || "Produto sem nome"}
                     </p>
@@ -377,6 +404,9 @@ export function CategoryProductsModal({
                           : linked.has(product.id_produto) ? " · Vinculado" : ""}
                     </p>
                   </div>
+                  <span className="w-20 shrink-0 text-right text-sm font-semibold text-dark dark:text-white">
+                    {product.site?.toUpperCase() === "S" ? "Ativo" : "Inativo"}
+                  </span>
                 </label>
               ))}
               {!data?.items.length && (
@@ -386,36 +416,11 @@ export function CategoryProductsModal({
               )}
             </div>
           )}
+          {data && !waitingFilter && <div ref={loadMoreRef} aria-hidden="true" className="h-px" />}
+          {loading && data && !waitingFilter && <p className="py-4 text-center text-sm" role="status">Carregando mais produtos...</p>}
+          {error && !loading && <button type="button" className={buttonClass} onClick={() => setRevision((value) => value + 1)}>Tentar novamente</button>}
         </main>
         <footer className="space-y-3 border-t border-stroke p-5 dark:border-dark-3">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span>
-              Página {page} de {data?.totalPages || 1}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={buttonClass}
-                disabled={busy || loading || waitingFilter || page <= 1}
-                onClick={() => setPage((value) => value - 1)}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className={buttonClass}
-                disabled={
-                  busy ||
-                  loading ||
-                  waitingFilter ||
-                  page >= (data?.totalPages || 1)
-                }
-                onClick={() => setPage((value) => value + 1)}
-              >
-                Próxima
-              </button>
-            </div>
-          </div>
           <p className="text-sm text-dark-4">
             {entityLabel === "categoria"
               ? "Marque para vincular e desmarque para remover desta categoria. Novos vínculos substituem a categoria anterior e removem subcategorias incompatíveis; remoções preservam as subcategorias existentes."

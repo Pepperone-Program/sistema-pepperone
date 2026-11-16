@@ -23,9 +23,9 @@ export async function associationProductsList(
       AND link.${idColumn} = ?)`;
   const [counts, items, links] = await Promise.all([
     query(`SELECT COUNT(*) AS total ${where}`, values) as Promise<Array<{ total: number }>>,
-    query(`SELECT id_produto, produto, codigo ${where}
+    query(`SELECT id_produto, produto, codigo, site ${where}
       ORDER BY ${linked} DESC, data_inclusao DESC, id_produto DESC LIMIT ? OFFSET ?`,
-      [...values, associationId, limit, (page - 1) * limit]) as Promise<Array<{ id_produto: number; produto: string; codigo: string }>>,
+      [...values, associationId, limit, (page - 1) * limit]) as Promise<Array<{ id_produto: number; produto: string; codigo: string; site: string }>>,
     query(`SELECT id_produto FROM ${table} WHERE id_empresa = ? AND ${idColumn} = ?`,
       [empresaId, associationId]) as Promise<Array<{ id_produto: number }>>,
   ]);

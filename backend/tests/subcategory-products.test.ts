@@ -106,14 +106,16 @@ describe('transactional subcategory assignment', () => {
   it('puts linked subcategory products before pagination', async () => {
     vi.mocked(query).mockImplementation(async (sql: string) => {
       if (sql.startsWith('SELECT COUNT')) return [{ total: 31 }];
-      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 3, produto: 'Caderno', codigo: 'C3' }];
+      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 3, produto: 'Caderno', codigo: 'C3', site: 'N' }];
       return [{ id_produto: 3 }];
     });
     const result = await SubcategoryProductsService.available(7, 9, '', '', 1, false);
     expect(result.linked_ids).toEqual([3]);
     expect(result.items[0].id_produto).toBe(3);
+    expect(result.items[0].site).toBe('N');
     const [sql, values] = vi.mocked(query).mock.calls.find(([statement]) => statement.startsWith('SELECT id_produto, produto'))!;
     expect(sql).toContain('ORDER BY EXISTS (SELECT 1 FROM aux_subcategorias_produtos link');
+    expect(sql).toContain('codigo, site FROM produtos');
     expect(sql).toContain('link.id_subcategoria = ?) DESC, data_inclusao DESC');
     expect(values).toEqual([7, 9, 30, 0]);
   });

@@ -129,15 +129,17 @@ describe('transactional category assignment', () => {
   it('puts linked products before pagination and returns their checked IDs', async () => {
     vi.mocked(query).mockImplementation(async (sql: string) => {
       if (sql.startsWith('SELECT COUNT')) return [{ total: 31 }];
-      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 4, produto: 'Bloco', codigo: 'B4' }];
+      if (sql.startsWith('SELECT id_produto, produto')) return [{ id_produto: 4, produto: 'Bloco', codigo: 'B4', site: 'S' }];
       return [{ id_produto: 4 }];
     });
     const result = await CategoryProductsService.available(7, 8, 'bloco', 'caneta', 1, false);
     expect(result.linked_ids).toEqual([4]);
     expect(result.items[0].id_produto).toBe(4);
+    expect(result.items[0].site).toBe('S');
     expect(result.totalPages).toBe(2);
     const [sql, values] = vi.mocked(query).mock.calls.find(([statement]) => statement.startsWith('SELECT id_produto, produto'))!;
     expect(sql).toContain('ORDER BY EXISTS (SELECT 1 FROM aux_categorias_produtos link');
+    expect(sql).toContain('codigo, site FROM produtos');
     expect(sql).toContain('link.id_empresa = produtos.id_empresa AND link.id_produto = produtos.id_produto');
     expect(sql).toContain('link.id_categoria = ?) DESC, data_inclusao DESC');
     expect(sql).toContain(adminProductExclusion('caneta').sql);
