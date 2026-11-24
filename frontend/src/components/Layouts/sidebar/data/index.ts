@@ -35,6 +35,12 @@ export const NAV_DATA: NavSection[] = [
         items: [],
       },
       {
+        title: "Planilhas",
+        url: "/planilhas",
+        icon: Icons.Table,
+        items: [],
+      },
+      {
         title: "Clientes",
         url: "/clientes",
         icon: Icons.User,
