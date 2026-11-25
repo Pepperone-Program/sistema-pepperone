@@ -14,10 +14,7 @@ export class PublicoAlvoController {
   static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const publicoAlvo = await PublicoAlvoService.createPublicoAlvo(req.body);
-      await CacheService.invalidateNamespace('publicos-alvos');
-      await CacheService.invalidateNamespace('categorias');
-      await CacheService.invalidateNamespace('tipos-produtos');
-      await CacheService.invalidateNamespace('datas-promocionais');
+      await CacheService.invalidateAfterWrite(['publicos-alvos', 'categorias', 'tipos-produtos', 'datas-promocionais']);
       successResponse(res, publicoAlvo, 'Publico-alvo criado com sucesso', 201);
     } catch (error) {
       const err = error as any;
@@ -72,10 +69,7 @@ export class PublicoAlvoController {
         parseInt(req.params.id, 10),
         req.body
       );
-      await CacheService.invalidateNamespace('publicos-alvos');
-      await CacheService.invalidateNamespace('categorias');
-      await CacheService.invalidateNamespace('tipos-produtos');
-      await CacheService.invalidateNamespace('datas-promocionais');
+      await CacheService.invalidateAfterWrite(['publicos-alvos', 'categorias', 'tipos-produtos', 'datas-promocionais']);
 
       successResponse(res, publicoAlvo, 'Publico-alvo atualizado com sucesso');
     } catch (error) {
@@ -87,10 +81,7 @@ export class PublicoAlvoController {
   static async delete(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       await PublicoAlvoService.deletePublicoAlvo(parseInt(req.params.id, 10));
-      await CacheService.invalidateNamespace('publicos-alvos');
-      await CacheService.invalidateNamespace('categorias');
-      await CacheService.invalidateNamespace('tipos-produtos');
-      await CacheService.invalidateNamespace('datas-promocionais');
+      await CacheService.invalidateAfterWrite(['publicos-alvos', 'categorias', 'tipos-produtos', 'datas-promocionais']);
       successResponse(res, null, 'Publico-alvo deletado com sucesso');
     } catch (error) {
       const err = error as any;
@@ -155,10 +146,7 @@ export class PublicoAlvoController {
         parseInt(req.params.id, 10),
         req.body
       );
-      await CacheService.invalidateNamespace('publicos-alvos');
-      await CacheService.invalidateNamespace('categorias');
-      await CacheService.invalidateNamespace('tipos-produtos');
-      await CacheService.invalidateNamespace('datas-promocionais');
+      await CacheService.invalidateAfterWrite(['publicos-alvos', 'categorias', 'tipos-produtos', 'datas-promocionais']);
 
       successResponse(res, vinculo, 'Produto vinculado ao publico-alvo com sucesso', 201);
     } catch (error) {
@@ -173,10 +161,7 @@ export class PublicoAlvoController {
         parseInt(req.params.id, 10),
         parseInt(req.params.produtoId, 10)
       );
-      await CacheService.invalidateNamespace('publicos-alvos');
-      await CacheService.invalidateNamespace('categorias');
-      await CacheService.invalidateNamespace('tipos-produtos');
-      await CacheService.invalidateNamespace('datas-promocionais');
+      await CacheService.invalidateAfterWrite(['publicos-alvos', 'categorias', 'tipos-produtos', 'datas-promocionais']);
 
       successResponse(res, null, 'Produto desvinculado do publico-alvo com sucesso');
     } catch (error) {

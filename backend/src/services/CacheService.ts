@@ -5,6 +5,7 @@ type RedisCommandResponse<T = unknown> = {
 
 const CACHE_PREFIX = 'site-pep:v2';
 const CATALOG_TTL_SECONDS = 30;
+const bypassUntil = new Map<string, number>();
 const productRelatedNamespaces = new Set([
   'categorias',
   'tipos-produtos',
@@ -54,6 +55,9 @@ export class CacheService {
     let redisMs = 0;
     const namespace = key.startsWith(`${CACHE_PREFIX}:`) ? key.slice(CACHE_PREFIX.length + 1).split(':')[0] : null;
     if (!namespace) return { value: await loader(), cacheStatus: 'disabled' };
+    if ((bypassUntil.get(namespace) || 0) > Date.now()) {
+      return { value: await loader(), cacheStatus: 'disabled' };
+    }
     let version: string;
     try {
       version = (await this.command<string | null>(['GET', `${CACHE_PREFIX}:generation:${namespace}`])).result || '0';
@@ -75,7 +79,7 @@ export class CacheService {
     const databaseMs = performance.now() - started - redisMs;
     try {
       const current = (await this.command<string | null>(['GET', `${CACHE_PREFIX}:generation:${namespace}`])).result || '0';
-      if (current === version) {
+      if (current === version && (bypassUntil.get(namespace) || 0) <= Date.now()) {
         const ttl = namespace === 'orcamentos'
           ? Math.max(ttlSeconds || CATALOG_TTL_SECONDS, 1)
           : Math.min(Math.max(ttlSeconds || CATALOG_TTL_SECONDS, 1), CATALOG_TTL_SECONDS);
@@ -101,6 +105,17 @@ export class CacheService {
     await this.invalidateNamespaces([namespace]);
   }
 
+  // A committed database write must not be reported as failed because Redis is unavailable.
+  static async invalidateAfterWrite(namespaces: string | string[]): Promise<void> {
+    try {
+      await this.invalidateNamespaces(Array.isArray(namespaces) ? namespaces : [namespaces]);
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'CACHE_INVALIDATION_FAILED') throw error;
+      // The browser uses a new cache key after a successful write. This protects
+      // other reads handled by this process until old Redis entries expire.
+    }
+  }
+
   static async invalidateNamespaces(namespaces: string[]): Promise<void> {
     if (!isEnabled()) return;
 
@@ -120,11 +135,15 @@ export class CacheService {
       this.command<number>(['INCR', `${CACHE_PREFIX}:generation:${normalizePart(namespace)}`])));
     const failure = outcomes.find((outcome) => outcome.status === 'rejected');
     if (failure?.status === 'rejected') {
+      for (const namespace of expandedNamespaces) {
+        bypassUntil.set(normalizePart(namespace), Date.now() + CATALOG_TTL_SECONDS * 1000);
+      }
       console.warn('[CacheService] invalidate failed', { namespaces: [...expandedNamespaces], message: String(failure.reason) });
       throw Object.assign(new Error('Dados salvos, mas a atualizacao do cache falhou. Consulte antes de repetir a operacao.'), {
         code: 'CACHE_INVALIDATION_FAILED', statusCode: 503,
       });
     }
+    for (const namespace of expandedNamespaces) bypassUntil.delete(normalizePart(namespace));
   }
 
   private static async command<T>(command: string[]): Promise<RedisCommandResponse<T>> {

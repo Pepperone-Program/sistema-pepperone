@@ -217,7 +217,7 @@ function productFieldLayout(field: ProductField) {
   return "md:col-span-2";
 }
 
-function ProductLinksPanel({ produtoId }: { produtoId: number }) {
+function ProductLinksPanel({ produtoId, onChanged }: { produtoId: number; onChanged?: () => Promise<void> }) {
   const [links, setLinks] = useState<ProductLinks | null>(null);
   const [options, setOptions] = useState<Record<string, Row[]>>({});
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -241,17 +241,24 @@ function ProductLinksPanel({ produtoId }: { produtoId: number }) {
   async function addLink(target: (typeof linkTargets)[number]) {
     const id = selected[target.key];
     if (!id) return;
+    setError("");
     await apiRequest(`${target.endpoint}/${id}/produtos`, {
       method: "POST",
       body: JSON.stringify({ id_produto: produtoId }),
     });
+    const added = (options[target.key] || []).find((item) => String(item[target.idField]) === id);
+    if (added) setLinks((current) => current ? { ...current, [target.key]: [...current[target.key], added] } : current);
     setSelected((current) => ({ ...current, [target.key]: "" }));
-    await loadLinks();
+    await loadLinks().catch(() => setError("Vínculo salvo. Não foi possível confirmar a lista atualizada."));
+    await onChanged?.();
   }
 
   async function removeLink(target: (typeof linkTargets)[number], id: unknown) {
+    setError("");
     await apiRequest(`${target.endpoint}/${String(id)}/produtos/${produtoId}`, { method: "DELETE" });
-    await loadLinks();
+    setLinks((current) => current ? { ...current, [target.key]: current[target.key].filter((item) => String(item[target.idField]) !== String(id)) } : current);
+    await loadLinks().catch(() => setError("Vínculo removido. Não foi possível confirmar a lista atualizada."));
+    await onChanged?.();
   }
 
   return (
@@ -473,7 +480,7 @@ function ProductModal({
                     <h3 className="text-base font-bold text-dark dark:text-white">Vínculos comerciais</h3>
                     <p className="mt-1 text-sm text-dark-4 dark:text-dark-6">Defina onde este produto será encontrado.</p>
                   </div>
-                  <ProductLinksPanel produtoId={productId} />
+                  <ProductLinksPanel produtoId={productId} onChanged={onSaved} />
                 </section>
                 <section className="rounded-lg border border-stroke bg-white p-4 dark:border-dark-3 dark:bg-gray-dark sm:p-5">
                   <div className="mb-5 border-b border-stroke pb-4 dark:border-dark-3">

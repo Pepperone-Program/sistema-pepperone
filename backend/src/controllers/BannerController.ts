@@ -12,7 +12,7 @@ export class BannerController {
   static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const banner = await BannerService.createBanner(getEmpresaId(req), req.body);
-      await CacheService.invalidateNamespace('banners');
+      await CacheService.invalidateAfterWrite('banners');
       successResponse(res, banner, 'Banner criado com sucesso', 201);
     } catch (error) {
       const err = error as any;
@@ -37,7 +37,7 @@ export class BannerController {
         },
         req.files as { desktop?: Express.Multer.File[]; mobile?: Express.Multer.File[] }
       );
-      await CacheService.invalidateNamespace('banners');
+      await CacheService.invalidateAfterWrite('banners');
       successResponse(res, banners, 'Banners desktop e mobile criados com sucesso', 201);
     } catch (error) {
       const err = error as any;
@@ -114,7 +114,7 @@ export class BannerController {
         parseInt(req.params.id, 10),
         req.body
       );
-      await CacheService.invalidateNamespace('banners');
+      await CacheService.invalidateAfterWrite('banners');
       successResponse(res, banner, 'Banner atualizado com sucesso');
     } catch (error) {
       const err = error as any;
@@ -128,7 +128,7 @@ export class BannerController {
         getEmpresaId(req),
         req.body?.bannerIds || []
       );
-      await CacheService.invalidateNamespace('banners');
+      await CacheService.invalidateAfterWrite('banners');
       successResponse(res, banners, 'Banners reordenados com sucesso');
     } catch (error) {
       const err = error as any;
@@ -139,7 +139,7 @@ export class BannerController {
   static async delete(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       await BannerService.deleteBanner(getEmpresaId(req), parseInt(req.params.id, 10));
-      await CacheService.invalidateNamespace('banners');
+      await CacheService.invalidateAfterWrite('banners');
       successResponse(res, null, 'Banner deletado com sucesso');
     } catch (error) {
       const err = error as any;

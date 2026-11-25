@@ -19,7 +19,7 @@ const productCacheNamespaces = [
 ];
 
 async function invalidateProductCaches(): Promise<void> {
-  await CacheService.invalidateNamespaces(productCacheNamespaces);
+  await CacheService.invalidateAfterWrite(productCacheNamespaces);
 }
 
 export class ProdutoController {

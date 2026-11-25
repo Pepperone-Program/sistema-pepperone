@@ -2320,7 +2320,7 @@ export class GenerateAiDescriptionService {
     };
 
     await Promise.all(Array.from({ length: Math.min(concurrency, productIds.length) }, worker));
-    await CacheService.invalidateNamespaces(['produtos', 'search-v2']);
+    await CacheService.invalidateAfterWrite(['produtos', 'search-v2']);
     const success = items.filter((item) => item.success).length;
     return {
       total: items.length,

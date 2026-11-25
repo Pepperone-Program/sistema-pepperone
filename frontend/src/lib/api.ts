@@ -21,6 +21,15 @@ export type PaginatedData<T> = {
 
 const API_BASE_PATH = "/api";
 const TOKEN_STORAGE_KEY = "pepperone_api_token";
+const CACHE_REVISION_KEY = "pepperone_admin_cache_revision";
+
+function cacheRevision() {
+  return window.sessionStorage.getItem(CACHE_REVISION_KEY) || "0";
+}
+
+function advanceCacheRevision() {
+  window.sessionStorage.setItem(CACHE_REVISION_KEY, String(Number(cacheRevision()) + 1));
+}
 
 export function getStoredToken() {
   if (typeof window === "undefined") {
@@ -56,6 +65,9 @@ function buildUrl(path: string, query?: RequestOptions["query"]) {
       url.searchParams.set(key, String(value));
     }
   });
+  if (url.pathname.startsWith("/api/v1/") && !url.searchParams.has("admin_revision")) {
+    url.searchParams.set("admin_revision", cacheRevision());
+  }
 
   return `${url.pathname}${url.search}`;
 }
@@ -80,6 +92,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
       payload?.error?.code ||
       `Falha na requisicao (${response.status})`;
     throw new Error(message);
+  }
+
+  if (options.method && !["GET", "HEAD"].includes(options.method.toUpperCase())) {
+    advanceCacheRevision();
   }
 
   return payload.data;
@@ -107,6 +123,8 @@ export async function apiFormRequest<T>(path: string, formData: FormData) {
       `Falha na requisicao (${response.status})`;
     throw new Error(message);
   }
+
+  advanceCacheRevision();
 
   return payload.data;
 }

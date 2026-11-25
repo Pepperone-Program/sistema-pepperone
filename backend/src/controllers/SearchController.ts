@@ -54,7 +54,7 @@ export class SearchController {
         VALUES (?,?,?,?,?,?,?,?,?,1) ON DUPLICATE KEY UPDATE term=VALUES(term),priority=VALUES(priority),relation_type=VALUES(relation_type),
         type=VALUES(type),canonical_value=VALUES(canonical_value),strength=VALUES(strength),active=VALUES(active),version=version+1`,
       [empresaId, term, normalizedTerm, type, canonicalValue, priority, relation, strength, req.body.active === false ? 0 : 1]);
-      await CacheService.invalidateNamespaces(['search', 'search-v2']);
+      await CacheService.invalidateAfterWrite(['search', 'search-v2']);
       successResponse(res, { normalized_term: normalizedTerm, canonical_value: canonicalValue }, 'Dicionario atualizado');
     } catch (error) { const err = error as Error; errorResponse(res, 'DICTIONARY_ERROR', err.message, 500); }
   }
@@ -62,7 +62,7 @@ export class SearchController {
   static async deleteDictionary(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       await query('UPDATE search_dictionary SET active = 0, version = version + 1 WHERE id_empresa = ? AND id = ?', [req.user!.id_empresa, Number(req.params.id)]);
-      await CacheService.invalidateNamespaces(['search', 'search-v2']);
+      await CacheService.invalidateAfterWrite(['search', 'search-v2']);
       successResponse(res, null, 'Entrada desativada');
     } catch (error) { const err = error as Error; errorResponse(res, 'DICTIONARY_ERROR', err.message, 500); }
   }

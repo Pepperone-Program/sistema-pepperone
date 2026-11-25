@@ -60,4 +60,13 @@ describe('generation based cache', () => {
       code: 'CACHE_INVALIDATION_FAILED', statusCode: 503,
     });
   });
+
+  it('acknowledges a committed write and bypasses stale Redis data when invalidation fails', async () => {
+    const key = CacheService.buildKey('produtos', '7:/api/v1/produtos');
+    await CacheService.getOrSet(key, async () => 'old');
+    failIncr = true;
+    await expect(CacheService.invalidateAfterWrite(['produtos'])).resolves.toBeUndefined();
+    expect(await CacheService.getOrSet(key, async () => 'new')).toBe('new');
+    expect(calls.filter(([operation, cacheKey]) => operation === 'GET' && cacheKey === 'site-pep:v2:generation:produtos')).toHaveLength(2);
+  });
 });
