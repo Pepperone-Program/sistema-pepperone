@@ -4,6 +4,8 @@ import { throwError } from '@utils/helpers';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
+export const MAX_PRODUCT_IMAGES = 15;
+
 export type ProdutoImage = ProdutoImagem & {
   filename: string;
   ordem: number;
@@ -206,6 +208,9 @@ export class ProdutoImageService {
     }
 
     const current = await ProdutoModel.findImagesByProductId(produtoId);
+    if (current.length + files.length > MAX_PRODUCT_IMAGES) {
+      throwError('PRODUCT_IMAGE_LIMIT', `O produto pode ter no maximo ${MAX_PRODUCT_IMAGES} imagens.`, 400);
+    }
     let nextOrder = current.reduce((max, image) => Math.max(max, Number(image.ordem_imagem)), 0) + 1;
 
     for (const [index, file] of files.entries()) {

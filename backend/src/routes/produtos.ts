@@ -6,6 +6,7 @@ import { productSchema } from '@utils/validation';
 import multer from 'multer';
 import { SearchController } from '@controllers/SearchController';
 import { ProductSpreadsheetService, type SpreadsheetModel } from '@services/ProductSpreadsheetService';
+import { MAX_PRODUCT_IMAGES } from '@services/ProdutoImageService';
 
 const router = Router();
 const spreadsheetModels = new Set<SpreadsheetModel>(['produtos', 'categorias', 'subcategorias', 'publicos-alvos']);
@@ -62,7 +63,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 12 * 1024 * 1024,
-    files: 8,
+    files: MAX_PRODUCT_IMAGES,
   },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -95,7 +96,7 @@ router.get(
 router.post(
   '/:id/images',
   authMiddleware,
-  upload.array('images', 8),
+  upload.array('images', MAX_PRODUCT_IMAGES),
   ProdutoController.uploadImages
 );
 

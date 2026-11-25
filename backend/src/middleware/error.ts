@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { errorResponse } from '@utils/response';
+import multer from 'multer';
 
 export const errorHandler = (
   error: any,
@@ -9,9 +10,11 @@ export const errorHandler = (
 ): void => {
   console.error('Error:', error);
 
-  const statusCode = error.statusCode || 500;
+  const statusCode = error instanceof multer.MulterError ? 400 : error.statusCode || 500;
   const code = error.code || 'INTERNAL_ERROR';
-  const message = error.message || 'Internal server error';
+  const message = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_COUNT'
+    ? 'Quantidade de arquivos acima do limite permitido'
+    : error.message || 'Internal server error';
 
   errorResponse(res, code, message, statusCode);
 };

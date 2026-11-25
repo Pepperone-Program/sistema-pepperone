@@ -23,6 +23,8 @@ type ProdutoImage = {
 };
 
 type Row = Record<string, unknown>;
+const MAX_PRODUCT_IMAGES = 15;
+const UPLOAD_BATCH_SIZE = 5;
 
 type Props = {
   endpoint: string;
@@ -48,6 +50,7 @@ export function ProductImagesPanel({
     new Set(),
   );
   const [error, setError] = useState("");
+  const availableSlots = Math.max(0, MAX_PRODUCT_IMAGES - images.length);
 
   const imageEndpoint = useMemo(
     () => `${endpoint}/${produtoId}/images`,
@@ -91,7 +94,11 @@ export function ProductImagesPanel({
       );
     });
     setOrderChanged(false);
-    await onChanged?.();
+    try {
+      await onChanged?.();
+    } catch {
+      setError("Imagens atualizadas, mas não foi possível atualizar a lista de produtos.");
+    }
   }
 
   async function persistOrder() {
@@ -120,22 +127,44 @@ export function ProductImagesPanel({
 
   async function handleUpload(files = selectedFiles) {
     if (!files.length) return;
+    if (files.length > availableSlots) {
+      setError(`Este produto pode ter até ${MAX_PRODUCT_IMAGES} fotos. Há ${availableSlots} ${availableSlots === 1 ? "vaga disponível" : "vagas disponíveis"}.`);
+      return;
+    }
 
     setSaving(true);
     setError("");
 
-    const formData = new FormData();
-    files.forEach((file) => formData.append("images", file));
-
+    let uploaded = 0;
+    let nextImages = images;
     try {
-      const response = await apiFormRequest<ProdutoImage[]>(
-        imageEndpoint,
-        formData,
-      );
+      for (let start = 0; start < files.length; start += UPLOAD_BATCH_SIZE) {
+        const batch = files.slice(start, start + UPLOAD_BATCH_SIZE);
+        const formData = new FormData();
+        batch.forEach((file) => formData.append("images", file));
+        nextImages = await apiFormRequest<ProdutoImage[]>(imageEndpoint, formData);
+        uploaded += batch.length;
+        setImages(nextImages);
+      }
       setSelectedFiles([]);
-      await refreshAfterChange(response);
+      await refreshAfterChange(nextImages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar imagens");
+      const reason = err instanceof Error ? err.message : "Falha ao enviar imagens";
+      try {
+        const confirmedImages = await apiRequest<ProdutoImage[]>(imageEndpoint);
+        uploaded += Math.min(Math.max(confirmedImages.length - nextImages.length, 0), files.length - uploaded);
+        setSelectedFiles(files.slice(uploaded));
+        await refreshAfterChange(confirmedImages);
+        setError(uploaded === files.length
+          ? "Todas as fotos aparecem no produto, apesar da falha na resposta do envio."
+          : uploaded
+          ? `${uploaded} ${uploaded === 1 ? "foto enviada" : "fotos enviadas"}. As restantes continuam selecionadas. ${reason}`
+          : reason);
+      } catch {
+        setSelectedFiles([]);
+        await refreshAfterChange(nextImages);
+        setError(`Não foi possível confirmar todas as fotos enviadas. Atualize a lista antes de tentar novamente. ${reason}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -222,7 +251,15 @@ export function ProductImagesPanel({
   }
 
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedFiles(Array.from(event.target.files || []));
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (files.length > availableSlots) {
+      setSelectedFiles([]);
+      setError(`Selecione até ${availableSlots} ${availableSlots === 1 ? "foto" : "fotos"} para este produto.`);
+      return;
+    }
+    setError("");
+    setSelectedFiles(files);
   }
 
   function handleDropFiles(event: DragEvent<HTMLDivElement>) {
@@ -231,8 +268,13 @@ export function ProductImagesPanel({
     const files = Array.from(event.dataTransfer.files || []).filter((file) =>
       file.type.startsWith("image/"),
     );
+    if (files.length > availableSlots) {
+      setSelectedFiles([]);
+      setError(`Selecione até ${availableSlots} ${availableSlots === 1 ? "foto" : "fotos"} para este produto.`);
+      return;
+    }
     setSelectedFiles(files);
-    handleUpload(files);
+    void handleUpload(files);
   }
 
   function moveImage(index: number, direction: -1 | 1) {
@@ -309,6 +351,9 @@ export function ProductImagesPanel({
               Arraste arquivos aqui ou selecione imagens para enviar ao storage
               e registrar na tabela.
             </p>
+            <p className="mt-1 text-xs font-medium text-dark-4 dark:text-dark-6">
+              {images.length} de {MAX_PRODUCT_IMAGES} fotos · {availableSlots} {availableSlots === 1 ? "vaga disponível" : "vagas disponíveis"}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="cursor-pointer rounded-md border border-stroke bg-white px-3 py-2 text-xs font-semibold text-dark hover:border-primary hover:text-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white">
@@ -316,6 +361,7 @@ export function ProductImagesPanel({
               <input
                 accept="image/*"
                 className="hidden"
+                disabled={saving || loading || availableSlots === 0}
                 multiple
                 onChange={handleFileInput}
                 type="file"
@@ -323,7 +369,7 @@ export function ProductImagesPanel({
             </label>
             <button
               className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-              disabled={saving || !selectedFiles.length}
+              disabled={saving || !selectedFiles.length || selectedFiles.length > availableSlots}
               onClick={() => handleUpload()}
               type="button"
             >
